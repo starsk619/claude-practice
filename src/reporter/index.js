@@ -157,9 +157,15 @@ function renderOutlookTables(analystResult) {
   </section>`;
 }
 
+/** 뉴스 카테고리별 표시 순서 + 이모지/제목. summarizer의 CATEGORIES와 맞춰서 관리한다. */
+const NEWS_CATEGORY_META = [
+  { key: 'ai', emoji: '🤖', title: 'AI 뉴스' },
+  { key: 'stock', emoji: '📈', title: '주식 뉴스' },
+  { key: 'society', emoji: '🗞️', title: '사회 뉴스' },
+];
+
 function renderNewsAndRationale(summaryResult, picks) {
-  const aiSummary = summaryResult?.categories?.ai ?? '오늘의 AI 뉴스 요약이 아직 없어요.';
-  const stockSummary = summaryResult?.categories?.stock ?? '오늘의 주식 뉴스 요약이 아직 없어요.';
+  const categories = summaryResult?.categories ?? {};
   const sourceItems = summaryResult?.sourceItems ?? [];
 
   const detailCards = picks.length
@@ -183,19 +189,19 @@ function renderNewsAndRationale(summaryResult, picks) {
 
   const sourcesBlock = renderSources(sourceItems);
 
+  const newsCards = NEWS_CATEGORY_META.map(({ key, emoji, title }) => {
+    const summary = categories[key] ?? `오늘의 ${title} 요약이 아직 없어요.`;
+    return `
+      <div class="news-card">
+        <div class="news-card-title">${emoji} ${title}</div>
+        <div class="news-card-body">${escapeAndBreak(summary)}</div>
+      </div>`;
+  }).join('');
+
   return `
   <section class="section">
     <h2 class="section-title">뉴스 요약</h2>
-    <div class="news-grid">
-      <div class="news-card">
-        <div class="news-card-title">🤖 AI 뉴스</div>
-        <div class="news-card-body">${escapeAndBreak(aiSummary)}</div>
-      </div>
-      <div class="news-card">
-        <div class="news-card-title">📈 주식 뉴스</div>
-        <div class="news-card-body">${escapeAndBreak(stockSummary)}</div>
-      </div>
-    </div>
+    <div class="news-grid">${newsCards}</div>
     ${sourcesBlock}
   </section>
 
@@ -314,7 +320,7 @@ const STYLE_BLOCK = `<style>
   .outlook-sub { font-weight: 400; font-size: 12px; color: #5f6368; }
   .outlook-body { font-size: 14px; white-space: normal; }
 
-  .news-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; }
+  .news-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 12px; }
   .news-card { background: #f8f9fb; border-radius: 12px; padding: 16px; }
   .news-card-title { font-weight: 700; margin-bottom: 8px; }
   .news-card-body { font-size: 14px; }

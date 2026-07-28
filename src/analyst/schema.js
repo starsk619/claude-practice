@@ -34,7 +34,9 @@ export const ANALYSIS_RESPONSE_SCHEMA = {
     },
     picks: {
       type: Type.ARRAY,
-      description: '개별 종목/자산에 대한 분석 목록. 근거 없는 추측성 종목 추천은 피할 것.',
+      description:
+        '개별 종목/자산에 대한 분석 목록. "매수 고려"/"관망"/"주의" 각 등급별로 2개씩(총 6개 ' +
+        '목표)를 담을 것. 근거 없는 추측성 종목 추천은 피할 것.',
       items: {
         type: Type.OBJECT,
         properties: {

@@ -2,11 +2,11 @@
  * AI 뉴스 + 주식 뉴스 RSS 수집 모듈.
  *
  * collectNews()는 src/types.js의 NewsItem 계약에 맞춘 정규화된 배열을 반환한다:
- *   { title, url, source, publishedAt(ISO), category: 'ai'|'stock', snippet? }
+ *   { title, url, source, publishedAt(ISO), category: 'ai'|'stock'|'society', snippet? }
  *
  * 소스 목록:
  * - 기본값: ./feeds.js의 DEFAULT_FEEDS (TechCrunch AI, VentureBeat AI,
- *   한국경제 증권, 매일경제 증권, 연합뉴스 경제)
+ *   한국경제 증권, 매일경제 증권, 연합뉴스 경제, 연합뉴스 사회)
  * - .env의 NEWS_RSS_FEEDS (콤마로 구분된 URL 목록)가 비어있지 않으면
  *   기본 목록 전체를 오버라이드한다. 이 경우 source/category는 URL로부터
  *   최선의 추정치를 사용한다 (normalize.js의 guessCategoryFromUrl 참고).

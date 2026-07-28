@@ -1,7 +1,7 @@
 /**
  * summarizer 모듈의 진입점.
  *
- * 책임: NewsItem[] 을 입력받아 카테고리별(AI 뉴스 / 주식 뉴스) 한글 요약을 생성하고
+ * 책임: NewsItem[] 을 입력받아 카테고리별(AI 뉴스 / 주식 뉴스 / 사회 뉴스) 한글 요약을 생성하고
  * 공유 계약(src/types.js)의 SummaryResult 형태로 반환한다.
  *
  * @typedef {import('../types.js').NewsItem} NewsItem
@@ -12,7 +12,7 @@ import { getGeminiClient, SUMMARIZER_MODEL } from './geminiClient.js';
 import { buildCategorySummaryPrompt } from './promptBuilder.js';
 
 /** src/types.js 계약상 NewsItem.category 가 가질 수 있는 값 */
-const CATEGORIES = ['ai', 'stock'];
+const CATEGORIES = ['ai', 'stock', 'society'];
 
 /** 해당 카테고리에 뉴스가 하나도 없을 때 사용할 안내 문구 */
 const EMPTY_CATEGORY_MESSAGE = '오늘 수집된 뉴스가 없습니다.';
@@ -28,7 +28,7 @@ function buildErrorMessage(error) {
  * 뉴스가 없으면 API를 호출하지 않고 안내 문구를 반환한다.
  * API 키가 없거나 호출이 실패해도 예외를 던지지 않고, 에러 메시지를 요약 문자열로 담아 반환한다.
  *
- * @param {'ai'|'stock'} category
+ * @param {'ai'|'stock'|'society'} category
  * @param {NewsItem[]} items
  * @returns {Promise<string>}
  */
@@ -58,7 +58,7 @@ async function summarizeCategory(category, items) {
 }
 
 /**
- * NewsItem[] 을 받아 카테고리별(AI 뉴스 / 주식 뉴스) 한글 요약을 생성한다.
+ * NewsItem[] 을 받아 카테고리별(AI 뉴스 / 주식 뉴스 / 사회 뉴스) 한글 요약을 생성한다.
  *
  * - 입력이 빈 배열이거나 undefined/null 이어도 에러 없이 처리한다.
  * - 각 카테고리 요약은 서로 독립적으로 실패할 수 있으며, 한 카테고리의 실패가
@@ -75,7 +75,7 @@ export async function summarizeNews(newsItems) {
 
   for (const category of CATEGORIES) {
     const categoryItems = items.filter((item) => item && item.category === category);
-    // eslint-disable-next-line no-await-in-loop -- 카테고리 수가 적고(2개), 순차 처리로 충분함
+    // eslint-disable-next-line no-await-in-loop -- 카테고리 수가 적고(3개), 순차 처리로 충분함
     categories[category] = await summarizeCategory(category, categoryItems);
   }
 

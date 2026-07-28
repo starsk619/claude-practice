@@ -46,6 +46,9 @@ ${categories.ai || '(요약 없음)'}
 ## 주식 뉴스 카테고리 요약
 ${categories.stock || '(요약 없음)'}
 
+## 사회 뉴스 카테고리 요약 (투자 판단에 참고할 배경 정보)
+${categories.society || '(요약 없음)'}
+
 ## 근거로 사용할 원본 뉴스 목록 (${trimmedItems.length}건)
 ${sourceList}${omittedNote}
 

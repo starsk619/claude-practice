@@ -6,6 +6,7 @@
 const CATEGORY_LABELS = {
   ai: 'AI(인공지능)',
   stock: '주식/증권',
+  society: '사회',
 };
 
 /**
@@ -32,7 +33,7 @@ function formatNewsItemsForPrompt(items) {
 
 /**
  * 카테고리별 한글 요약 요청 프롬프트를 생성한다.
- * @param {'ai'|'stock'} category
+ * @param {'ai'|'stock'|'society'} category
  * @param {NewsItem[]} items - 해당 카테고리에 속하는 뉴스만 필터링되어 들어온다고 가정
  * @returns {string}
  */

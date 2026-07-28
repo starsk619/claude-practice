@@ -9,7 +9,7 @@
  * @property {string} url
  * @property {string} source
  * @property {string} publishedAt - ISO 8601 날짜 문자열
- * @property {'ai'|'stock'} category
+ * @property {'ai'|'stock'|'society'} category
  * @property {string} [snippet] - 본문 일부 요약(있으면)
  */
 
@@ -19,6 +19,7 @@
  * @property {Object} categories
  * @property {string} categories.ai - AI 뉴스 카테고리 요약(한글)
  * @property {string} categories.stock - 주식 뉴스 카테고리 요약(한글)
+ * @property {string} categories.society - 사회 뉴스 카테고리 요약(한글)
  * @property {NewsItem[]} sourceItems - 요약에 사용된 원본 뉴스 목록
  */
 

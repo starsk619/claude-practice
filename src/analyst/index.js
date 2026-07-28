@@ -25,9 +25,14 @@ function assertValidSummaryResult(summaryResult) {
     throw new Error('[analyst] analyzeInvestment(summaryResult) - summaryResult가 필요합니다.');
   }
   const categories = summaryResult.categories;
-  if (!categories || typeof categories.ai !== 'string' || typeof categories.stock !== 'string') {
+  if (
+    !categories ||
+    typeof categories.ai !== 'string' ||
+    typeof categories.stock !== 'string' ||
+    typeof categories.society !== 'string'
+  ) {
     throw new Error(
-      '[analyst] summaryResult.categories.ai / categories.stock 문자열이 필요합니다 (SummaryResult 계약 위반).'
+      '[analyst] summaryResult.categories.ai / categories.stock / categories.society 문자열이 필요합니다 (SummaryResult 계약 위반).'
     );
   }
 }
@@ -52,7 +57,7 @@ export async function analyzeInvestment(summaryResult) {
         systemInstruction,
         responseMimeType: 'application/json',
         responseSchema: ANALYSIS_RESPONSE_SCHEMA,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 16384,
       },
     });
   } catch (err) {

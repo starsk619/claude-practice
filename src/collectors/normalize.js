@@ -39,7 +39,7 @@ export function buildSnippet(item) {
 /**
  * rss-parser의 단일 feed item을 NewsItem으로 변환한다.
  * @param {any} item - rss-parser가 반환한 원본 아이템
- * @param {{source: string, category: 'ai'|'stock', url: string}} feedConfig
+ * @param {{source: string, category: 'ai'|'stock'|'society', url: string}} feedConfig
  * @returns {import('../types.js').NewsItem}
  */
 export function normalizeItem(item, feedConfig) {
@@ -58,7 +58,7 @@ export function normalizeItem(item, feedConfig) {
  * .env의 NEWS_RSS_FEEDS로 오버라이드된 URL은 source/category 메타데이터가 없으므로
  * 최선의 추정치로 채운다.
  * @param {string} url
- * @returns {'ai'|'stock'}
+ * @returns {'ai'|'stock'|'society'}
  */
 export function guessCategoryFromUrl(url) {
   const lower = url.toLowerCase();
@@ -73,9 +73,11 @@ export function guessCategoryFromUrl(url) {
     '주식',
   ];
   const aiHints = ['ai', 'artificial-intelligence', 'tech', 'ml'];
+  const societyHints = ['society', '사회'];
 
   if (stockHints.some((hint) => lower.includes(hint))) return 'stock';
   if (aiHints.some((hint) => lower.includes(hint))) return 'ai';
+  if (societyHints.some((hint) => lower.includes(hint))) return 'society';
   // 판단 근거가 없으면 ai를 기본값으로 사용 (보수적 폴백)
   return 'ai';
 }
