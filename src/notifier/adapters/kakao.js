@@ -34,8 +34,11 @@ function requireConfig() {
 /**
  * refresh_token으로 새 access_token을 발급받는다.
  * 카카오는 refresh_token 남은 유효기간이 1개월 미만일 때만 새 refresh_token을 함께 내려주는데,
- * 이 경우 .env를 자동으로 고쳐 쓰지 않고 콘솔에 경고만 남긴다(로컬 파일을 앱이 직접 덮어쓰는 건
- * 예상치 못한 부작용을 만들 수 있어 사람이 직접 갱신하도록 함).
+ * GitHub Actions 예약 실행에서는 사람이 로그를 매일 보지 않으므로 콘솔 경고만으로는 놓치기
+ * 쉽다. 그래서 새 refresh_token 자체는 반환값으로 알려주고, 실제 알림은 sendTemplate에서
+ * 카카오톡 메시지로 한 번 더 보낸다 (.env/시크릿을 앱이 직접 고쳐쓰지는 않음 - 예상치 못한
+ * 부작용을 막기 위해 항상 사람이 직접 갱신하게 함).
+ * @returns {Promise<{ accessToken: string, newRefreshToken: string | null }>}
  */
 async function refreshAccessToken() {
   const { restApiKey, clientSecret, refreshToken } = requireConfig();
@@ -65,17 +68,16 @@ async function refreshAccessToken() {
 
   if (json.refresh_token) {
     console.warn(
-      '[kakao] 카카오가 새 refresh_token을 발급했습니다. .env의 KAKAO_REFRESH_TOKEN을 아래 값으로 갱신하세요:'
+      '[kakao] 카카오가 새 refresh_token을 발급했습니다. GitHub Secrets의 KAKAO_REFRESH_TOKEN을 갱신하세요 (이 실행 로그에서 값 확인 가능).'
     );
     console.warn(`KAKAO_REFRESH_TOKEN=${json.refresh_token}`);
   }
 
-  return json.access_token;
+  return { accessToken: json.access_token, newRefreshToken: json.refresh_token ?? null };
 }
 
-async function sendTemplate(templateObject) {
-  const accessToken = await refreshAccessToken();
-
+/** accessToken을 이미 갖고 있을 때 사용하는 저수준 발송 함수 (refreshAccessToken 재호출 없음). */
+async function sendWithToken(accessToken, templateObject) {
   const body = new URLSearchParams({
     template_object: JSON.stringify(templateObject),
   });
@@ -95,6 +97,34 @@ async function sendTemplate(templateObject) {
     throw new Error(`[kakao] 메시지 전송 실패: ${desc}`);
   }
   return { ok: true };
+}
+
+/**
+ * refresh_token이 새로 발급된 경우, 실제로 매일 확인하는 카카오톡으로 갱신 필요 알림을 보낸다.
+ * (실제 새 토큰 값은 보안상 메시지에 담지 않고, GitHub Actions 로그를 확인하라고만 안내)
+ * 알림 발송 자체가 실패해도 메인 메시지 발송 결과에는 영향을 주지 않는다(best-effort).
+ */
+async function notifyRefreshTokenRotated(accessToken) {
+  try {
+    await sendWithToken(accessToken, {
+      object_type: 'text',
+      text: '⚠️ [news-bot] 카카오 리프레시 토큰이 새로 발급됐습니다. GitHub Actions 실행 로그에서 새 값을 확인해 Secrets의 KAKAO_REFRESH_TOKEN을 갱신해주세요. 갱신하지 않으면 기존 토큰 만료 시 리포트 발송이 멈춥니다.',
+      link: { web_url: FALLBACK_LINK, mobile_web_url: FALLBACK_LINK },
+    });
+  } catch (err) {
+    console.error('[kakao] 리프레시 토큰 갱신 알림 발송 실패 (원본 메시지는 정상 발송됨):', err);
+  }
+}
+
+async function sendTemplate(templateObject) {
+  const { accessToken, newRefreshToken } = await refreshAccessToken();
+  const result = await sendWithToken(accessToken, templateObject);
+
+  if (newRefreshToken) {
+    await notifyRefreshTokenRotated(accessToken);
+  }
+
+  return result;
 }
 
 /**
