@@ -5,6 +5,7 @@ import { escapeHtml, escapeAndBreak, formatRichText, formatKoreanDate } from './
 import { getRatingStyle, getConfidenceDots } from './ratings.js';
 import { buildHeadline } from './headline.js';
 import { CATEGORIES, CATEGORY_LABELS, CATEGORY_EMOJI } from '../categories.js';
+import { selectDiverseSources } from '../newsSelection.js';
 
 export { buildHeadline, buildShortDigest, countByRating } from './headline.js';
 
@@ -232,15 +233,10 @@ function renderNewsAndRationale(summaryResult, picks) {
   </section>`;
 }
 
-const MAX_SOURCE_LIST_ITEMS = 10;
-
 function renderSources(sourceItems) {
   if (!sourceItems.length) return '';
 
-  // NewsItem에는 조회수 데이터가 없어(RSS가 제공하지 않음) "인기순"으로 정렬할 수는 없고,
-  // 대신 리포트가 너무 길어지지 않도록 최대 10건만 보여준다.
-  const limitedItems = sourceItems.slice(0, MAX_SOURCE_LIST_ITEMS);
-  const omittedCount = sourceItems.length - limitedItems.length;
+  const limitedItems = selectDiverseSources(sourceItems);
 
   const items = limitedItems
     .map((item) => {
@@ -252,13 +248,9 @@ function renderSources(sourceItems) {
     })
     .join('');
 
-  const summaryText = omittedCount > 0
-    ? `원본 기사 목록 보기 (${limitedItems.length}건 표시, 전체 ${sourceItems.length}건 중)`
-    : `원본 기사 목록 보기 (${limitedItems.length}건)`;
-
   return `
     <details class="sources">
-      <summary>${summaryText}</summary>
+      <summary>분야별 주요 원본 기사 보기 (${limitedItems.length}건)</summary>
       <ul class="source-list">${items}</ul>
     </details>`;
 }

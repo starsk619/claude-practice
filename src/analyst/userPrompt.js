@@ -2,8 +2,10 @@
  * SummaryResult -> 모델에 전달할 user 메시지 텍스트 빌더.
  */
 import { CATEGORIES, CATEGORY_LABELS } from '../categories.js';
+import { selectDiverseSources } from '../newsSelection.js';
 
 const MAX_SOURCE_ITEMS = 30; // 프롬프트 길이 폭주 방지
+const MAX_SOURCE_ITEMS_PER_CATEGORY = 6; // 카테고리 하나(예: AI)가 목록을 독점하지 않도록
 const MAX_SNIPPET_LENGTH = 300;
 
 /** 종목 분석과 직접적인 투자 판단 근거라기보다 "배경 정보" 성격이 강한 카테고리 */
@@ -59,7 +61,10 @@ export function buildUserPrompt(summaryResult, marketContext = []) {
   const now = new Date().toISOString();
   const categories = summaryResult.categories || {};
   const sourceItems = Array.isArray(summaryResult.sourceItems) ? summaryResult.sourceItems : [];
-  const trimmedItems = sourceItems.slice(0, MAX_SOURCE_ITEMS);
+  const trimmedItems = selectDiverseSources(sourceItems, {
+    maxTotal: MAX_SOURCE_ITEMS,
+    maxPerCategory: MAX_SOURCE_ITEMS_PER_CATEGORY,
+  });
   const omittedCount = sourceItems.length - trimmedItems.length;
 
   const sourceList = trimmedItems.length
