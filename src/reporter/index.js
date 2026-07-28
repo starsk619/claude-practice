@@ -173,8 +173,8 @@ function renderNewsAndRationale(summaryResult, picks) {
           <span class="detail-card-title">${style.emoji} ${escapeHtml(pick?.name ?? '종목명 미상')} (${escapeHtml(pick?.ticker ?? '-')})</span>
           <span class="detail-card-rating" style="color:${style.fg};">${escapeHtml(style.label)}</span>
         </div>
-        <div class="detail-row"><span class="detail-label">근거</span><span>${escapeAndBreak(pick?.rationale ?? '-')}</span></div>
-        <div class="detail-row"><span class="detail-label">리스크</span><span>${escapeAndBreak(pick?.risk ?? '-')}</span></div>
+        <div class="detail-row"><span class="detail-label">근거</span><span>${formatRichText(pick?.rationale ?? '-')}</span></div>
+        <div class="detail-row"><span class="detail-label">리스크</span><span>${formatRichText(pick?.risk ?? '-')}</span></div>
         <div class="detail-row"><span class="detail-label">확신도</span><span>${escapeHtml(pick?.confidence ?? '정보 없음')} <span class="confidence-dots">${dots}</span></span></div>
       </div>`;
         })
