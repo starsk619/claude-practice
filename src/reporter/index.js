@@ -158,6 +158,29 @@ function renderOutlookTables(analystResult) {
   </section>`;
 }
 
+/**
+ * StockPick.priceInfo(src/priceData가 채운 실제 시세)를 리포트용 문자열로 렌더링한다.
+ * 한국 시장 관례대로 상승은 빨강, 하락은 파랑으로 표시한다.
+ * @param {import('../types.js').PriceInfo|null} [priceInfo]
+ */
+function renderPriceInfo(priceInfo) {
+  if (!priceInfo) {
+    return '<span class="price-missing">가격 정보 없음 (종목명 매핑 또는 시세 조회 실패)</span>';
+  }
+  const { currentPrice, changePercent, high52w, low52w, currency } = priceInfo;
+  const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('ko-KR') : '-');
+  const currencyLabel = escapeHtml(currency ?? '');
+
+  let changeHtml = '<span class="price-flat">등락률 정보 없음</span>';
+  if (typeof changePercent === 'number') {
+    const sign = changePercent > 0 ? '+' : '';
+    const cls = changePercent > 0 ? 'price-up' : changePercent < 0 ? 'price-down' : 'price-flat';
+    changeHtml = `<span class="${cls}">${sign}${changePercent}%</span>`;
+  }
+
+  return `${fmt(currentPrice)}${currencyLabel} (${changeHtml}) · 52주 ${fmt(low52w)}~${fmt(high52w)}`;
+}
+
 function renderNewsAndRationale(summaryResult, picks) {
   const categories = summaryResult?.categories ?? {};
   const sourceItems = summaryResult?.sourceItems ?? [];
@@ -173,9 +196,11 @@ function renderNewsAndRationale(summaryResult, picks) {
           <span class="detail-card-title">${style.emoji} ${escapeHtml(pick?.name ?? '종목명 미상')} (${escapeHtml(pick?.ticker ?? '-')})</span>
           <span class="detail-card-rating" style="color:${style.fg};">${escapeHtml(style.label)}</span>
         </div>
+        <div class="detail-row"><span class="detail-label">시세</span><span>${renderPriceInfo(pick?.priceInfo)}</span></div>
         <div class="detail-row"><span class="detail-label">근거</span><span>${formatRichText(pick?.rationale ?? '-')}</span></div>
         <div class="detail-row"><span class="detail-label">리스크</span><span>${formatRichText(pick?.risk ?? '-')}</span></div>
         <div class="detail-row"><span class="detail-label">확신도</span><span>${escapeHtml(pick?.confidence ?? '정보 없음')} <span class="confidence-dots">${dots}</span></span></div>
+        <div class="detail-row"><span class="detail-label">포지션</span><span>${formatRichText(pick?.positionGuidance ?? '-')}</span></div>
       </div>`;
         })
         .join('')
@@ -337,6 +362,10 @@ const STYLE_BLOCK = `<style>
   .detail-row { font-size: 13.5px; margin-bottom: 4px; display: flex; gap: 6px; }
   .detail-label { flex: 0 0 56px; color: #5f6368; font-weight: 600; }
   .confidence-dots { letter-spacing: 2px; color: #1a237e; }
+  /* 한국 시장 관례: 상승=빨강, 하락=파랑 */
+  .price-up { color: #d32f2f; font-weight: 700; }
+  .price-down { color: #1a73e8; font-weight: 700; }
+  .price-flat, .price-missing { color: #5f6368; }
 
   .glossary-section { background: #fafbfc; }
   .glossary-details summary { cursor: pointer; color: #1a73e8; font-weight: 600; font-size: 14px; }

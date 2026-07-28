@@ -8,6 +8,7 @@
     "start": "node src/index.js",
     "check-secrets": "node scripts/check-secrets.js",
     "kakao:auth": "node scripts/kakao-auth.js",
+    "fetch-krx-list": "node scripts/fetch-krx-list.js",
     "prepare": "husky"
   },
   "dependencies": {

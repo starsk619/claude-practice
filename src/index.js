@@ -10,6 +10,7 @@ import { validateEnv, config } from './config.js';
 import { collectNews } from './collectors/index.js';
 import { summarizeNews } from './summarizer/index.js';
 import { analyzeInvestment } from './analyst/index.js';
+import { enrichPicksWithPriceData } from './priceData/index.js';
 import { generateReport, saveReportToFile } from './reporter/index.js';
 import { sendDailyReport, scheduleDailyRun } from './notifier/index.js';
 
@@ -41,22 +42,27 @@ export async function runDailyPipeline() {
   const analystResult = await analyzeInvestment(summaryResult);
   console.log(`[news-bot] 3/4 투자 분석 완료: 종목 ${analystResult.picks?.length ?? 0}건`);
 
-  const html = generateReport(summaryResult, analystResult);
+  // 뉴스 텍스트만으로는 "이미 주가에 반영됐는지" 알 수 없어서, 실제 시세(무료 Yahoo Finance)를
+  // 붙여 보완한다. 종목명이 KRX 목록에 없거나 시세 조회가 실패해도 파이프라인은 계속 진행된다.
+  const enrichedPicks = await enrichPicksWithPriceData(analystResult.picks);
+  const analystResultWithPrices = { ...analystResult, picks: enrichedPicks };
+
+  const html = generateReport(summaryResult, analystResultWithPrices);
   const { historyPath, latestPath } = await saveReportToFile(html, {
-    generatedAt: analystResult.generatedAt,
+    generatedAt: analystResultWithPrices.generatedAt,
   });
   console.log(`[news-bot] 4/4 리포트 저장: ${historyPath} (공개용 최신본: ${latestPath})`);
 
   const channels = resolveActiveChannels();
   if (channels.length === 0) {
     console.warn('[news-bot] 발송 채널이 설정되지 않아 발송을 건너뜁니다 (.env의 SLACK_WEBHOOK_URL / TELEGRAM_BOT_TOKEN+CHAT_ID / KAKAO_* 확인).');
-    return { newsItems, summaryResult, analystResult, reportPath: historyPath, sendResults: [] };
+    return { newsItems, summaryResult, analystResult: analystResultWithPrices, reportPath: historyPath, sendResults: [] };
   }
 
   const sendResults = await sendDailyReport({
     channels,
     summaryResult,
-    analystResult,
+    analystResult: analystResultWithPrices,
     reportPath: latestPath,
     reportUrl: config.reportPublicUrl,
   });
@@ -64,7 +70,7 @@ export async function runDailyPipeline() {
     console.log(`[news-bot] 발송(${result.channel}): ${result.ok ? '성공' : `실패 - ${result.error}`}`);
   }
 
-  return { newsItems, summaryResult, analystResult, reportPath: historyPath, sendResults };
+  return { newsItems, summaryResult, analystResult: analystResultWithPrices, reportPath: historyPath, sendResults };
 }
 
 async function main() {

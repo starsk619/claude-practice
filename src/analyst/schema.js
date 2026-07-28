@@ -76,8 +76,19 @@ export const ANALYSIS_RESPONSE_SCHEMA = {
               '확신도. 데이터/수치 기반 발언이면 강함, 정황상 추정이면 중간, ' +
               '추측성 발언이면 약함. 반드시 이 세 값 중 하나: 강함 | 중간 | 약함',
           },
+          positionGuidance: {
+            type: Type.STRING,
+            description:
+              '이 종목에 대한 일반적인 리스크관리 원칙(포지션 비중 %, 손절선 % 등)을 ' +
+              'rating/confidence에 맞춰 서술. 확신도가 강하고 매수 고려일수록 상대적으로 ' +
+              '적극적으로(예: "총자산의 5~10% 이내 분할 매수, 매수가 대비 -8~10% 손절선 권장"), ' +
+              '확신도가 약하거나 주의 등급일수록 보수적으로(예: "신규 진입 자제, 보유 중이면 ' +
+              '비중 축소 검토") 서술. 특정 금액이나 개인 자산 규모를 가정하지 말고 %/일반 원칙 ' +
+              '기준으로만 서술하며, "일반적인 원칙이며 개인 자산 상황에 따라 조정이 필요하다"는 ' +
+              '취지를 반드시 포함할 것.',
+          },
         },
-        required: ['ticker', 'name', 'rating', 'rationale', 'risk', 'confidence'],
+        required: ['ticker', 'name', 'rating', 'rationale', 'risk', 'confidence', 'positionGuidance'],
       },
     },
     disclaimer: {

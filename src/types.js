@@ -32,6 +32,17 @@
  * @property {string} rationale - 근거(수치/출처/날짜 인용)
  * @property {string} risk - 리스크 요인
  * @property {'강함'|'중간'|'약함'} confidence
+ * @property {PriceInfo|null} [priceInfo] - src/priceData가 채워주는 실제 시세(뉴스 텍스트만으로는
+ *   알 수 없는 "이미 주가에 반영됐는지" 감을 잡기 위함). 종목명 매핑/시세 조회 실패 시 null.
+ */
+
+/**
+ * @typedef {Object} PriceInfo
+ * @property {number} currentPrice
+ * @property {number|null} changePercent - 전일 대비 등락률(%)
+ * @property {number|null} high52w
+ * @property {number|null} low52w
+ * @property {string} currency
  */
 
 /**

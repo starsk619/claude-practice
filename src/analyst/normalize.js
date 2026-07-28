@@ -49,6 +49,10 @@ function normalizePick(rawPick) {
     rationale: toSafeString(pick.rationale, '근거 데이터 부족 (모델이 근거를 제공하지 않음)'),
     risk: toSafeString(pick.risk, '리스크 요인 정보 부족'),
     confidence: normalizeConfidence(pick.confidence),
+    positionGuidance: toSafeString(
+      pick.positionGuidance,
+      '포지션 가이드 정보 부족 (일반적으로 확신도가 약할수록 비중을 보수적으로 가져가세요).'
+    ),
   };
 }
 
