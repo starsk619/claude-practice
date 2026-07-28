@@ -73,7 +73,9 @@ async function main() {
   const runOnce = process.argv.includes('--once');
   if (runOnce) {
     await runDailyPipeline();
-    return;
+    // Gemini SDK 등이 내부적으로 열어둔 커넥션이 남아있으면 프로세스가 스스로 종료되지 않을 수 있어
+    // (GitHub Actions에서 스텝이 끝나지 않고 계속 대기하는 문제로 확인됨) 명시적으로 종료한다.
+    process.exit(0);
   }
 
   scheduleDailyRun(runDailyPipeline);
