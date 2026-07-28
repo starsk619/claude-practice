@@ -127,4 +127,17 @@ export function resetGeminiClientCache() { ... }
 ### 2026-07-28 — 모델명을 latest 별칭으로 변경
 - 실제 사용자 키로 `node src/index.js --once` 테스트 중 `gemini-2.5-flash`가 "신규 사용자에게는 더 이상 제공되지 않음(404)" 에러 발생. Google 모델 목록 API(`models?key=...`)로 실제 사용 가능한 모델을 직접 조회하고 `generateContent`로 실동작까지 확인한 뒤, 특정 버전 고정 대신 `gemini-flash-latest`(항상 현재 권장 flash 모델을 가리키는 별칭)로 변경 — 이후 Google이 특정 버전을 또 폐기해도 자동으로 최신 모델을 쓰게 됨.
 
+### 2026-07-28 — 카테고리 8개 확장 + 요약 호출을 1번으로 묶음
+- 뉴스 카테고리가 3개(ai/stock/society)에서 8개로 늘어나면서(`src/categories.js` 참고),
+  기존처럼 카테고리마다 따로 `generateContent`를 호출하면 한 번 실행에 최대 8번 호출 —
+  Gemini 무료 티어의 모델당 하루 20건 제한을 실행 몇 번 만에 소진해버리는 문제 발생
+  (실제로 반복 테스트 중 `RESOURCE_EXHAUSTED` 429 에러로 확인).
+- `promptBuilder.buildCategorySummaryPrompt(category, items)` → `buildBatchSummaryPrompt(itemsByCategory)`로
+  교체: 뉴스가 있는 카테고리를 전부 모아 프롬프트 하나에 넣고, `schema.js`(신규)의
+  `buildSummaryResponseSchema(activeCategories)`로 카테고리별 JSON 응답을 한 번에 받도록 변경
+  (analyst 모듈의 responseSchema 패턴과 동일).
+- 트레이드오프: 카테고리별 독립 실패 처리는 포기(호출 자체가 하나이므로 실패하면 그 회차에
+  뉴스가 있던 모든 카테고리가 같은 에러 메시지로 채워짐). 대신 API 호출 횟수가 최대 8번 → 1번으로
+  줄어 할당량 소모가 크게 감소.
+
 <!-- 이 모듈을 수정할 때마다 아래에 "### YYYY-MM-DD — 변경 요약" 형식으로 새 항목을 추가할 것 -->
