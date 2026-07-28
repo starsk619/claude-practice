@@ -15,7 +15,7 @@ export function buildSummaryResponseSchema(activeCategories) {
     const label = CATEGORY_LABELS[category] ?? category;
     properties[category] = {
       type: Type.STRING,
-      description: `"${label}" 카테고리 한글 요약 (최소 3문장/3개 불릿, 마지막 줄에 "(총 N건)" 표기)`,
+      description: `"${label}" 카테고리 한글 요약 (최소 3문장/3개 불릿)`,
     };
   }
 
