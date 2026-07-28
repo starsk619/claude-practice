@@ -12,6 +12,10 @@ import { fetchValuationInfo } from './naverValuation.js';
 import { findTicker } from './tickerLookup.js';
 import { CORE_WATCHLIST_NAMES, CORE_WATCHLIST_OVERRIDES } from './watchlist.js';
 
+// fetchValuationInfo(네이버 금융)는 6자리 KRX 종목코드 전용이라, 해외 상장 override
+// (예: 쿠팡 CPNG)처럼 KRX 접미사가 없는 종목엔 호출하면 안 된다(불필요한 HTTP 409).
+const KRX_SUFFIXES = new Set(['KS', 'KQ', 'KN']);
+
 /**
  * 오늘 뉴스에서 이미 찾은 종목과 겹치지 않는 핵심 관심 종목들을 후보로 추가한다.
  * 뉴스 언급이 없으므로 mentionCount는 0으로 표시해서, 프롬프트에서 "뉴스 때문이 아니라
@@ -67,7 +71,7 @@ export async function buildMarketContext(newsItems, options = {}) {
     candidates.map(async (candidate) => {
       const [priceInfo, valuation] = await Promise.all([
         fetchPriceInfo(candidate.code, candidate.suffix),
-        fetchValuationInfo(candidate.code),
+        KRX_SUFFIXES.has(candidate.suffix) ? fetchValuationInfo(candidate.code) : null,
       ]);
       if (!priceInfo) return null; // 가격 조회 자체가 안 되면 판단 근거로 쓸 게 없어 제외
 

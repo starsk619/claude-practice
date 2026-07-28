@@ -5,17 +5,24 @@
  * - 무료, API 키 불필요. 다만 비공식 API라 예고 없이 스펙이 바뀌거나 막힐 수 있다
  *   (실패 시 null을 반환하고 예외를 던지지 않는다 - 호출부에서 "가격 정보 없음"으로 처리).
  * - 한국 종목은 종목코드 뒤에 시장 접미사가 붙는다: 코스피 "005930.KS", 코스닥 "035720.KQ".
- * - range=3mo&interval=1d를 붙이면 같은 응답에 meta(현재가 등)와 과거 일별 종가가 함께 와서,
- *   API 호출 한 번으로 가격 정보 + 변동성 계산 재료를 동시에 얻는다.
+ * - range=1y&interval=1d를 붙이면 같은 응답에 meta(현재가 등)와 1년치 일별 종가가 함께 와서,
+ *   API 호출 한 번으로 가격 정보 + 52주 고저 + 변동성 계산 재료를 동시에 얻는다.
+ * - meta.fiftyTwoWeekHigh/Low, meta.chartPreviousClose는 비인증 요청에서 신뢰할 수 없는
+ *   경우가 있어(0으로 오거나 액면분할/유상증자 보정이 안 됨) 쓰지 않고, 직접 받아온 종가
+ *   배열에서 계산한다. 등락률/변동성은 액면분할·배당을 보정한 adjclose를 우선 사용하고,
+ *   코스피/코스닥 상하한가(±30%)를 넘는 값은 기업행위/데이터 오류로 보고 이상치로 제외한다.
  */
 
 const CHART_API_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart/';
-const HISTORY_RANGE = '3mo';
+const HISTORY_RANGE = '1y';
 const HISTORY_INTERVAL = '1d';
 const TRADING_DAYS_PER_YEAR = 252;
+const VOLATILITY_WINDOW_DAYS = 63; // 약 3개월치 거래일
+const KRX_DAILY_LIMIT_PERCENT = 30; // 코스피/코스닥 개별 종목 일일 상하한가
 
 /**
  * 일별 종가 배열로 연환산 변동성(%)을 계산한다 (일별 로그수익률의 표준편차 × sqrt(252) × 100).
+ * 코스피/코스닥 상하한가(±30%)를 넘는 하루 수익률은 기업행위/데이터 오류로 보고 제외한다.
  * @param {Array<number|null>} closes
  * @returns {number | null}
  */
@@ -23,10 +30,14 @@ function computeAnnualizedVolatilityPercent(closes) {
   const valid = (closes ?? []).filter((c) => typeof c === 'number' && c > 0);
   if (valid.length < 10) return null; // 너무 적은 데이터로 계산하면 신뢰도가 낮음
 
+  const maxAbsLogReturn = Math.log(1 + KRX_DAILY_LIMIT_PERCENT / 100);
   const logReturns = [];
   for (let i = 1; i < valid.length; i++) {
-    logReturns.push(Math.log(valid[i] / valid[i - 1]));
+    const logReturn = Math.log(valid[i] / valid[i - 1]);
+    if (Math.abs(logReturn) > maxAbsLogReturn) continue;
+    logReturns.push(logReturn);
   }
+  if (logReturns.length < 10) return null;
 
   const mean = logReturns.reduce((sum, r) => sum + r, 0) / logReturns.length;
   const variance =
@@ -67,21 +78,38 @@ export async function fetchPriceInfo(code, suffix) {
     }
 
     const currentPrice = meta.regularMarketPrice;
+    const closes = result?.indicators?.quote?.[0]?.close;
+    const adjCloses = result?.indicators?.adjclose?.[0]?.adjclose ?? closes;
+
+    // 52주 고/저는 실제 거래가(raw close) 기준으로 직접 계산한다(meta 필드는 신뢰 불가).
+    const validCloses = (closes ?? []).filter((c) => typeof c === 'number' && c > 0);
+    const high52w = validCloses.length ? Math.max(...validCloses) : null;
+    const low52w = validCloses.length ? Math.min(...validCloses) : null;
+
+    // 코스피/코스닥 상하한가(±30%)를 넘는 등락률은 기업행위/데이터 오류로 보고 제외한다.
     const previousClose = meta.chartPreviousClose ?? meta.previousClose;
-    const changePercent =
+    let changePercent =
       typeof previousClose === 'number' && previousClose !== 0
         ? ((currentPrice - previousClose) / previousClose) * 100
         : null;
+    if (changePercent !== null && Math.abs(changePercent) > KRX_DAILY_LIMIT_PERCENT) {
+      console.warn(
+        `[priceData] "${symbol}" 등락률 ${changePercent.toFixed(2)}%는 KRX 상하한가(±${KRX_DAILY_LIMIT_PERCENT}%)를 초과해 이상치로 제외`
+      );
+      changePercent = null;
+    }
 
-    const closes = result?.indicators?.quote?.[0]?.close;
+    // 변동성은 분할/배당 보정된 adjclose로 계산해 기업행위로 인한 인위적 급등락을 배제한다.
+    const validAdjCloses = (adjCloses ?? []).filter((c) => typeof c === 'number' && c > 0);
+    const recentAdjCloses = validAdjCloses.slice(-VOLATILITY_WINDOW_DAYS);
 
     return {
       currentPrice,
       changePercent: changePercent !== null ? Math.round(changePercent * 100) / 100 : null,
-      high52w: meta.fiftyTwoWeekHigh ?? null,
-      low52w: meta.fiftyTwoWeekLow ?? null,
+      high52w,
+      low52w,
       currency: meta.currency ?? 'KRW',
-      annualizedVolatilityPercent: computeAnnualizedVolatilityPercent(closes),
+      annualizedVolatilityPercent: computeAnnualizedVolatilityPercent(recentAdjCloses),
     };
   } catch (error) {
     console.warn(`[priceData] "${symbol}" 가격 조회 중 오류:`, error?.message ?? error);
