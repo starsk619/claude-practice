@@ -36,6 +36,7 @@
 /**
  * @typedef {Object} AnalystResult
  * @property {string} generatedAt
+ * @property {string} headline - 오늘 시장을 한 문장으로 요약하는 총평(종목명 나열 없이, 20~30자 내외)
  * @property {string} shortTermOutlook - 1일~1개월 전망(근거 포함)
  * @property {string} longTermOutlook - 6개월~1년+ 전망(근거 포함)
  * @property {StockPick[]} picks

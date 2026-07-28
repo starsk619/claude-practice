@@ -103,11 +103,14 @@ async function sendTemplate(templateObject) {
 async function sendText(text) {
   const truncated =
     text.length > TEXT_MAX_LENGTH ? `${text.slice(0, TEXT_MAX_LENGTH - 1)}…` : text;
+  // 카카오 앱에 등록된 "웹 도메인"이 아닌 링크는 인앱 브라우저에서 열리지 않으므로
+  // (developers.kakao.com은 미등록 도메인이라 404), 등록된 REPORT_PUBLIC_URL을 우선 사용한다.
+  const link = process.env.REPORT_PUBLIC_URL || FALLBACK_LINK;
 
   return sendTemplate({
     object_type: 'text',
     text: truncated,
-    link: { web_url: FALLBACK_LINK, mobile_web_url: FALLBACK_LINK },
+    link: { web_url: link, mobile_web_url: link },
   });
 }
 

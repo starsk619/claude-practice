@@ -16,48 +16,18 @@ export function countByRating(picks = []) {
 }
 
 /**
- * 마크다운 스타일 **굵게** 마커와 줄바꿈을 제거해서, 헤드라인/다이제스트 같은
- * "짧은 평문" 맥락에 넣기 좋은 문자열로 만든다.
- * @param {string} [text]
- * @param {number} [maxLen]
- * @returns {string}
- */
-function shortPhrase(text, maxLen = 40) {
-  if (!text) return '';
-  const clean = String(text).replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
-  return clean.length > maxLen ? `${clean.slice(0, maxLen)}…` : clean;
-}
-
-/**
- * 전문용어 없이, "지금 뜨는 건 뭐고 지금 지는 건 뭔지"를 구체적으로 말하는 한줄 요약을 만든다.
+ * 애널리스트가 생성한 시장 총평(analystResult.headline)을 리포트/다이제스트에 넣기 좋은
+ * "오늘의 한줄 결론: ..." 형태로 감싼다. 종목명을 나열하지 않는 짧은 시장 한줄평이라
  * 리포트 최상단과 메신저 다이제스트 양쪽에서 재사용해 "매일 같은 톤"을 보장한다.
  * @param {import('../types.js').AnalystResult} [analystResult]
  * @returns {string}
  */
 export function buildHeadline(analystResult) {
-  const picks = analystResult?.picks ?? [];
-
-  if (!picks.length) {
-    return '오늘의 한줄 결론: 오늘은 특별히 짚을 종목이 없어요 — 아래 시장 전망만 참고해주세요.';
+  const headline = analystResult?.headline;
+  if (!headline) {
+    return '오늘의 한줄 결론: 오늘은 특별히 짚을 시장 총평이 없어요 — 아래 시장 전망만 참고해주세요.';
   }
-
-  const rising = picks.find((p) => p?.rating === '매수 고려');
-  const falling = picks.find((p) => p?.rating === '주의');
-
-  const parts = [];
-  if (rising) {
-    parts.push(`📈 지금 뜨는 건 ${rising.name ?? '종목 미상'} — ${shortPhrase(rising.rationale)}`);
-  }
-  if (falling) {
-    parts.push(`📉 지금 지는 건 ${falling.name ?? '종목 미상'} — ${shortPhrase(falling.rationale)}`);
-  }
-
-  if (!parts.length) {
-    const counts = countByRating(picks);
-    return `오늘의 한줄 결론: 오늘은 대부분 관망(${counts['관망']}개) 구간이에요 — 뚜렷한 방향 없이 지켜봐야 하는 하루예요.`;
-  }
-
-  return `오늘의 한줄 결론: ${parts.join(' / ')}`;
+  return `오늘의 한줄 결론: ${headline}`;
 }
 
 /**

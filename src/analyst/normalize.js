@@ -62,6 +62,7 @@ export function normalizeAnalystResult(rawInput) {
 
   return {
     generatedAt: new Date().toISOString(),
+    headline: toSafeString(input.headline, '오늘의 시장 총평 정보가 부족합니다.').slice(0, 60),
     shortTermOutlook: toSafeString(
       input.shortTermOutlook,
       '단기 전망 정보 부족 (모델이 결과를 제공하지 않음)'

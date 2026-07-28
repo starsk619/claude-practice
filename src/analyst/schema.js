@@ -15,6 +15,13 @@ export const CONFIDENCE_VALUES = ['강함', '중간', '약함'];
 export const ANALYSIS_RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
+    headline: {
+      type: Type.STRING,
+      description:
+        '오늘 시장을 한 문장으로 요약하는 총평. 특정 종목명을 나열하지 말고, 시장/섹터 관점의 ' +
+        '짧은 총평으로 작성할 것. 20~30자 내외로 짧게 (예: "AI 관련주 중심 관심, 반도체는 조정 ' +
+        '국면"). 상세 근거는 shortTermOutlook 등 다른 필드에서 다루므로 여기서는 결론만 짧게.',
+    },
     shortTermOutlook: {
       type: Type.STRING,
       description:
@@ -78,5 +85,5 @@ export const ANALYSIS_RESPONSE_SCHEMA = {
       description: '면책 문구. "투자 자문이 아니며 참고용"이라는 취지의 문구를 반드시 포함할 것.',
     },
   },
-  required: ['shortTermOutlook', 'longTermOutlook', 'picks', 'disclaimer'],
+  required: ['headline', 'shortTermOutlook', 'longTermOutlook', 'picks', 'disclaimer'],
 };
