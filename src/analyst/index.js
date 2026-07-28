@@ -20,6 +20,7 @@ import { buildUserPrompt } from './userPrompt.js';
 import { ANALYSIS_RESPONSE_SCHEMA } from './schema.js';
 import { normalizeAnalystResult } from './normalize.js';
 import { CATEGORIES } from '../categories.js';
+import { withGeminiRetry } from '../geminiRetry.js';
 
 function assertValidSummaryResult(summaryResult) {
   if (!summaryResult || typeof summaryResult !== 'object') {
@@ -47,16 +48,20 @@ export async function analyzeInvestment(summaryResult) {
 
   let response;
   try {
-    response = await client.models.generateContent({
-      model: ANALYST_MODEL,
-      contents: userPrompt,
-      config: {
-        systemInstruction,
-        responseMimeType: 'application/json',
-        responseSchema: ANALYSIS_RESPONSE_SCHEMA,
-        maxOutputTokens: 16384,
-      },
-    });
+    response = await withGeminiRetry(
+      () =>
+        client.models.generateContent({
+          model: ANALYST_MODEL,
+          contents: userPrompt,
+          config: {
+            systemInstruction,
+            responseMimeType: 'application/json',
+            responseSchema: ANALYSIS_RESPONSE_SCHEMA,
+            maxOutputTokens: 16384,
+          },
+        }),
+      { label: 'analyst' }
+    );
   } catch (err) {
     throw new Error(`[analyst] Gemini API 호출 실패: ${err.message}`, { cause: err });
   }

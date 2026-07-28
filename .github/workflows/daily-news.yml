@@ -30,7 +30,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # GitHub가 Node 20 러너를 곧 지원 종료할 예정이라(경고 발생), 러너 기본값과
+          # 맞춰 24로 사용. 이 프로젝트 코드는 표준 fetch/FormData 등만 써서 호환 문제 없음.
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies

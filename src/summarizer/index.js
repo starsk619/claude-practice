@@ -18,6 +18,7 @@ import { getGeminiClient, SUMMARIZER_MODEL } from './geminiClient.js';
 import { buildBatchSummaryPrompt } from './promptBuilder.js';
 import { buildSummaryResponseSchema } from './schema.js';
 import { CATEGORIES } from '../categories.js';
+import { withGeminiRetry } from '../geminiRetry.js';
 
 /** 해당 카테고리에 뉴스가 하나도 없을 때 사용할 안내 문구 */
 const EMPTY_CATEGORY_MESSAGE = '오늘 수집된 뉴스가 없습니다.';
@@ -66,15 +67,19 @@ export async function summarizeNews(newsItems) {
       const prompt = buildBatchSummaryPrompt(activeItemsByCategory);
       const schema = buildSummaryResponseSchema(activeCategories);
 
-      const response = await client.models.generateContent({
-        model: SUMMARIZER_MODEL,
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: schema,
-          maxOutputTokens: 8192,
-        },
-      });
+      const response = await withGeminiRetry(
+        () =>
+          client.models.generateContent({
+            model: SUMMARIZER_MODEL,
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: schema,
+              maxOutputTokens: 8192,
+            },
+          }),
+        { label: 'summarizer' }
+      );
 
       const text = response.text?.trim();
       if (!text) {
