@@ -10,7 +10,7 @@ import { findMentionedCompanies } from './candidateExtractor.js';
 import { fetchPriceInfo } from './yahooFinance.js';
 import { fetchValuationInfo } from './naverValuation.js';
 import { findTicker } from './tickerLookup.js';
-import { CORE_WATCHLIST_NAMES } from './watchlist.js';
+import { CORE_WATCHLIST_NAMES, CORE_WATCHLIST_OVERRIDES } from './watchlist.js';
 
 /**
  * 오늘 뉴스에서 이미 찾은 종목과 겹치지 않는 핵심 관심 종목들을 후보로 추가한다.
@@ -24,6 +24,12 @@ function buildWatchlistCandidates(existingCodes) {
     const ticker = findTicker(name);
     if (!ticker || existingCodes.has(ticker.code)) continue;
     candidates.push({ name, code: ticker.code, suffix: ticker.suffix, mentionCount: 0 });
+    existingCodes.add(ticker.code);
+  }
+  for (const override of CORE_WATCHLIST_OVERRIDES) {
+    if (existingCodes.has(override.code)) continue;
+    candidates.push({ ...override, mentionCount: 0 });
+    existingCodes.add(override.code);
   }
   return candidates;
 }

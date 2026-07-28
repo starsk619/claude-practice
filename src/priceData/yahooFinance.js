@@ -37,17 +37,18 @@ function computeAnnualizedVolatilityPercent(closes) {
 }
 
 /**
- * @param {string} code - 6자리 종목코드
- * @param {string} suffix - 'KS'(코스피) | 'KQ'(코스닥) | 'KN'(코넥스, 사실상 미지원)
+ * @param {string} code - 종목코드 (국내는 6자리 KRX 코드, 해외 상장은 티커 그대로 예: "CPNG")
+ * @param {string | null} [suffix] - 'KS'(코스피) | 'KQ'(코스닥) | 'KN'(코넥스, 사실상 미지원).
+ *   해외 상장 종목처럼 국가 접미사가 없는 경우 null/빈 값을 넘기면 종목코드 그대로 조회한다.
  * @returns {Promise<{
  *   currentPrice: number, changePercent: number|null, high52w: number|null, low52w: number|null,
  *   currency: string, annualizedVolatilityPercent: number|null
  * } | null>}
  */
 export async function fetchPriceInfo(code, suffix) {
-  if (!code || !suffix) return null;
+  if (!code) return null;
 
-  const symbol = `${code}.${suffix}`;
+  const symbol = suffix ? `${code}.${suffix}` : code;
   try {
     const res = await fetch(
       `${CHART_API_BASE}${symbol}?range=${HISTORY_RANGE}&interval=${HISTORY_INTERVAL}`,
