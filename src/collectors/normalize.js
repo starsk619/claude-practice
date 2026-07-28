@@ -39,7 +39,7 @@ export function buildSnippet(item) {
 /**
  * rss-parser의 단일 feed item을 NewsItem으로 변환한다.
  * @param {any} item - rss-parser가 반환한 원본 아이템
- * @param {{source: string, category: 'ai'|'stock'|'society', url: string}} feedConfig
+ * @param {{source: string, category: string, url: string}} feedConfig
  * @returns {import('../types.js').NewsItem}
  */
 export function normalizeItem(item, feedConfig) {
@@ -57,27 +57,28 @@ export function normalizeItem(item, feedConfig) {
  * URL/도메인 문자열을 보고 카테고리를 추정한다.
  * .env의 NEWS_RSS_FEEDS로 오버라이드된 URL은 source/category 메타데이터가 없으므로
  * 최선의 추정치로 채운다.
+ * 더 구체적인 카테고리(사회/경제/국제/정치/연예/IT과학)부터 먼저 검사하고,
+ * 마지막에 주식/AI 순으로 넓은 힌트를 검사한다(둘 다 매칭 안 되면 ai로 보수적 폴백).
  * @param {string} url
- * @returns {'ai'|'stock'|'society'}
+ * @returns {string} src/categories.js의 CATEGORIES 중 하나
  */
 export function guessCategoryFromUrl(url) {
   const lower = url.toLowerCase();
-  const stockHints = [
-    'stock',
-    'finance',
-    'financ',
-    'invest',
-    'market',
-    '증권',
-    '경제',
-    '주식',
-  ];
-  const aiHints = ['ai', 'artificial-intelligence', 'tech', 'ml'];
-  const societyHints = ['society', '사회'];
 
-  if (stockHints.some((hint) => lower.includes(hint))) return 'stock';
-  if (aiHints.some((hint) => lower.includes(hint))) return 'ai';
-  if (societyHints.some((hint) => lower.includes(hint))) return 'society';
+  const hintsByCategory = {
+    society: ['society', '사회'],
+    economy: ['economy', '경제'],
+    international: ['international', 'world', '국제', '세계'],
+    politics: ['politics', '정치'],
+    entertainment: ['entertainment', '연예'],
+    itScience: ['it-science', '/it/', 'feed/it', 'science', '과학'],
+    stock: ['stock', 'finance', 'financ', 'invest', 'market', '증권', '주식'],
+    ai: ['artificial-intelligence', 'category/ai', '/ai/', 'tech', 'ml'],
+  };
+
+  for (const [category, hints] of Object.entries(hintsByCategory)) {
+    if (hints.some((hint) => lower.includes(hint))) return category;
+  }
   // 판단 근거가 없으면 ai를 기본값으로 사용 (보수적 폴백)
   return 'ai';
 }

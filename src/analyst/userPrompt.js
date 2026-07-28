@@ -1,9 +1,18 @@
 /**
  * SummaryResult -> 모델에 전달할 user 메시지 텍스트 빌더.
  */
+import { CATEGORIES, CATEGORY_LABELS } from '../categories.js';
 
 const MAX_SOURCE_ITEMS = 30; // 프롬프트 길이 폭주 방지
 const MAX_SNIPPET_LENGTH = 300;
+
+/** 종목 분석과 직접적인 투자 판단 근거라기보다 "배경 정보" 성격이 강한 카테고리 */
+const BACKGROUND_ONLY_CATEGORIES = new Set([
+  'society',
+  'international',
+  'politics',
+  'entertainment',
+]);
 
 /**
  * @param {import('../types.js').NewsItem} item
@@ -37,17 +46,16 @@ export function buildUserPrompt(summaryResult) {
 
   const omittedNote = omittedCount > 0 ? `\n(그 외 ${omittedCount}건은 지면 관계로 생략)` : '';
 
+  const categorySections = CATEGORIES.map((key) => {
+    const label = CATEGORY_LABELS[key] ?? key;
+    const suffix = BACKGROUND_ONLY_CATEGORIES.has(key) ? ' (투자 판단에 참고할 배경 정보)' : '';
+    return `## ${label} 뉴스 카테고리 요약${suffix}\n${categories[key] || '(요약 없음)'}`;
+  }).join('\n\n');
+
   return `현재 시각(기준일): ${now}
 이 시각을 기준으로 "단기(1일~1개월)"와 "장기(6개월~1년 이상)"를 계산하세요.
 
-## AI 뉴스 카테고리 요약
-${categories.ai || '(요약 없음)'}
-
-## 주식 뉴스 카테고리 요약
-${categories.stock || '(요약 없음)'}
-
-## 사회 뉴스 카테고리 요약 (투자 판단에 참고할 배경 정보)
-${categories.society || '(요약 없음)'}
+${categorySections}
 
 ## 근거로 사용할 원본 뉴스 목록 (${trimmedItems.length}건)
 ${sourceList}${omittedNote}

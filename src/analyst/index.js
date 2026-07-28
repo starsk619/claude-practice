@@ -19,20 +19,17 @@ import { buildSystemPrompt } from './systemPrompt.js';
 import { buildUserPrompt } from './userPrompt.js';
 import { ANALYSIS_RESPONSE_SCHEMA } from './schema.js';
 import { normalizeAnalystResult } from './normalize.js';
+import { CATEGORIES } from '../categories.js';
 
 function assertValidSummaryResult(summaryResult) {
   if (!summaryResult || typeof summaryResult !== 'object') {
     throw new Error('[analyst] analyzeInvestment(summaryResult) - summaryResult가 필요합니다.');
   }
   const categories = summaryResult.categories;
-  if (
-    !categories ||
-    typeof categories.ai !== 'string' ||
-    typeof categories.stock !== 'string' ||
-    typeof categories.society !== 'string'
-  ) {
+  const missing = CATEGORIES.filter((key) => typeof categories?.[key] !== 'string');
+  if (missing.length > 0) {
     throw new Error(
-      '[analyst] summaryResult.categories.ai / categories.stock / categories.society 문자열이 필요합니다 (SummaryResult 계약 위반).'
+      `[analyst] summaryResult.categories.{${missing.join(', ')}} 문자열이 필요합니다 (SummaryResult 계약 위반).`
     );
   }
 }

@@ -4,22 +4,23 @@
  */
 
 /**
+ * NewsItem.category / SummaryResult.categories 키로 쓰이는 값들의 실제 목록은
+ * src/categories.js의 CATEGORIES(단일 출처)를 참고할 것. 현재: ai, stock, society,
+ * economy, international, politics, itScience, entertainment.
+ *
  * @typedef {Object} NewsItem
  * @property {string} title
  * @property {string} url
  * @property {string} source
  * @property {string} publishedAt - ISO 8601 날짜 문자열
- * @property {'ai'|'stock'|'society'} category
+ * @property {string} category - src/categories.js의 CATEGORIES 중 하나
  * @property {string} [snippet] - 본문 일부 요약(있으면)
  */
 
 /**
  * @typedef {Object} SummaryResult
  * @property {string} generatedAt - ISO 8601 날짜 문자열
- * @property {Object} categories
- * @property {string} categories.ai - AI 뉴스 카테고리 요약(한글)
- * @property {string} categories.stock - 주식 뉴스 카테고리 요약(한글)
- * @property {string} categories.society - 사회 뉴스 카테고리 요약(한글)
+ * @property {Object<string, string>} categories - src/categories.js의 CATEGORIES 각 키별 한글 요약
  * @property {NewsItem[]} sourceItems - 요약에 사용된 원본 뉴스 목록
  */
 

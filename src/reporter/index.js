@@ -4,6 +4,7 @@ import path from 'node:path';
 import { escapeHtml, escapeAndBreak, formatRichText, formatKoreanDate } from './htmlUtils.js';
 import { getRatingStyle, getConfidenceDots } from './ratings.js';
 import { buildHeadline } from './headline.js';
+import { CATEGORIES, CATEGORY_LABELS, CATEGORY_EMOJI } from '../categories.js';
 
 export { buildHeadline, buildShortDigest, countByRating } from './headline.js';
 
@@ -157,13 +158,6 @@ function renderOutlookTables(analystResult) {
   </section>`;
 }
 
-/** 뉴스 카테고리별 표시 순서 + 이모지/제목. summarizer의 CATEGORIES와 맞춰서 관리한다. */
-const NEWS_CATEGORY_META = [
-  { key: 'ai', emoji: '🤖', title: 'AI 뉴스' },
-  { key: 'stock', emoji: '📈', title: '주식 뉴스' },
-  { key: 'society', emoji: '🗞️', title: '사회 뉴스' },
-];
-
 function renderNewsAndRationale(summaryResult, picks) {
   const categories = summaryResult?.categories ?? {};
   const sourceItems = summaryResult?.sourceItems ?? [];
@@ -189,7 +183,9 @@ function renderNewsAndRationale(summaryResult, picks) {
 
   const sourcesBlock = renderSources(sourceItems);
 
-  const newsCards = NEWS_CATEGORY_META.map(({ key, emoji, title }) => {
+  const newsCards = CATEGORIES.map((key) => {
+    const emoji = CATEGORY_EMOJI[key] ?? '📰';
+    const title = CATEGORY_LABELS[key] ?? key;
     const summary = categories[key] ?? `오늘의 ${title} 요약이 아직 없어요.`;
     return `
       <div class="news-card">
