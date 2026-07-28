@@ -55,10 +55,13 @@ jobs:
 
       - name: Prepare Pages artifact
         # 공개 URL 구조(.../reports/daily-briefing.html)를 그대로 맞추기 위해
-        # _site/reports/ 아래에 최신 리포트 파일만 복사한다 (과거 이력은 배포하지 않음).
+        # _site/reports/ 아래에 최신 리포트 파일만 복사한다 (과거 HTML 이력은 배포하지 않음).
+        # pick-history.json은 "판단 이력"을 다음 실행이 다시 읽어올 수 있도록 함께 배포한다
+        # (repo에 쓰기 권한 없이도 GitHub Pages를 통해 최소한의 지속성을 확보하는 방식).
         run: |
           mkdir -p _site/reports
           cp reports/daily-briefing.html _site/reports/daily-briefing.html
+          cp reports/pick-history.json _site/reports/pick-history.json
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

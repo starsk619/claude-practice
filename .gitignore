@@ -15,4 +15,5 @@ node_modules/
 
 # 자동 생성되는 리포트 (폴더 구조만 유지)
 reports/*.html
+reports/*.json
 !reports/.gitkeep

@@ -9,6 +9,24 @@
 import { findMentionedCompanies } from './candidateExtractor.js';
 import { fetchPriceInfo } from './yahooFinance.js';
 import { fetchValuationInfo } from './naverValuation.js';
+import { findTicker } from './tickerLookup.js';
+import { CORE_WATCHLIST_NAMES } from './watchlist.js';
+
+/**
+ * 오늘 뉴스에서 이미 찾은 종목과 겹치지 않는 핵심 관심 종목들을 후보로 추가한다.
+ * 뉴스 언급이 없으므로 mentionCount는 0으로 표시해서, 프롬프트에서 "뉴스 때문이 아니라
+ * 상시 관심 종목이라 포함됨"을 구분할 수 있게 한다.
+ * @param {Set<string>} existingCodes
+ */
+function buildWatchlistCandidates(existingCodes) {
+  const candidates = [];
+  for (const name of CORE_WATCHLIST_NAMES) {
+    const ticker = findTicker(name);
+    if (!ticker || existingCodes.has(ticker.code)) continue;
+    candidates.push({ name, code: ticker.code, suffix: ticker.suffix, mentionCount: 0 });
+  }
+  return candidates;
+}
 
 /**
  * @typedef {Object} MarketContextEntry
@@ -33,7 +51,10 @@ import { fetchValuationInfo } from './naverValuation.js';
  * @returns {Promise<MarketContextEntry[]>} 실제 가격 조회에 성공한 종목만 포함(실패한 건 제외)
  */
 export async function buildMarketContext(newsItems, options = {}) {
-  const candidates = findMentionedCompanies(newsItems, options);
+  const newsCandidates = findMentionedCompanies(newsItems, options);
+  const existingCodes = new Set(newsCandidates.map((c) => c.code));
+  const watchlistCandidates = buildWatchlistCandidates(existingCodes);
+  const candidates = [...newsCandidates, ...watchlistCandidates];
   if (!candidates.length) return [];
 
   const entries = await Promise.all(

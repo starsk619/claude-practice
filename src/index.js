@@ -12,6 +12,13 @@ import { summarizeNews } from './summarizer/index.js';
 import { analyzeInvestment } from './analyst/index.js';
 import { enrichPicksWithPriceData } from './priceData/index.js';
 import { buildMarketContext } from './priceData/marketContext.js';
+import {
+  derivePickHistoryUrl,
+  fetchPickHistory,
+  buildHistoryEntry,
+  appendPickHistory,
+  savePickHistoryToFile,
+} from './pickHistory/index.js';
 import { generateReport, saveReportToFile } from './reporter/index.js';
 import { sendDailyReport, scheduleDailyRun } from './notifier/index.js';
 
@@ -45,13 +52,26 @@ export async function runDailyPipeline() {
   const marketContext = await buildMarketContext(newsItems);
   console.log(`[news-bot] 시장 데이터 준비: ${marketContext.length}개 종목 참고 데이터 확보`);
 
-  const analystResult = await analyzeInvestment(summaryResult, marketContext);
+  // GitHub Actions는 매번 새 러너에서 실행돼 로컬에 어제 기록이 없으므로, 이미 공개
+  // 배포된 이력 JSON을 다시 읽어와 "최근 판단 이력"으로 analyst에 제공한다(일관성 유지용).
+  const pickHistoryUrl = derivePickHistoryUrl(config.reportPublicUrl);
+  const pickHistory = await fetchPickHistory(pickHistoryUrl);
+  console.log(`[news-bot] 판단 이력 조회: 최근 리포트 ${pickHistory.length}건 확보`);
+
+  const analystResult = await analyzeInvestment(summaryResult, marketContext, pickHistory);
   console.log(`[news-bot] 3/4 투자 분석 완료: 종목 ${analystResult.picks?.length ?? 0}건`);
 
   // 뉴스 텍스트만으로는 "이미 주가에 반영됐는지" 알 수 없어서, 실제 시세(무료 Yahoo Finance)를
   // 붙여 보완한다. 종목명이 KRX 목록에 없거나 시세 조회가 실패해도 파이프라인은 계속 진행된다.
   const enrichedPicks = await enrichPicksWithPriceData(analystResult.picks);
   const analystResultWithPrices = { ...analystResult, picks: enrichedPicks };
+
+  // 이번 판단 결과를 이력에 추가해서 저장해두면, 다음 실행(내일 08:00) 때 다시 읽어와
+  // "지난번엔 이 종목을 뭐라고 판단했는지" 참고할 수 있다. 리포트 파일과 함께 GitHub
+  // Pages로 배포되도록 reports/ 디렉터리에 저장한다(워크플로에서 _site로 복사).
+  const updatedPickHistory = appendPickHistory(pickHistory, buildHistoryEntry(analystResultWithPrices));
+  const pickHistoryPath = await savePickHistoryToFile(updatedPickHistory);
+  console.log(`[news-bot] 판단 이력 저장: ${pickHistoryPath} (총 ${updatedPickHistory.length}건 유지)`);
 
   const html = generateReport(summaryResult, analystResultWithPrices);
   const { historyPath, latestPath } = await saveReportToFile(html, {

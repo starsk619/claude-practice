@@ -38,15 +38,17 @@ function assertValidSummaryResult(summaryResult) {
 /**
  * @param {import('../types.js').SummaryResult} summaryResult
  * @param {import('../priceData/marketContext.js').MarketContextEntry[]} [marketContext] - 오늘
- *   뉴스에 언급된 종목의 실제 시세/밸류에이션/변동성 (picks 결정 전 판단 근거로 제공)
+ *   뉴스에 언급된 종목 + 핵심 관심 종목의 실제 시세/밸류에이션/변동성 (picks 결정 전 판단 근거로 제공)
+ * @param {import('../pickHistory/index.js').PickHistoryEntry[]} [pickHistory] - 최근 리포트의
+ *   실제 판단 이력 (일관성 유지 + 판단 이후 주가 흐름 참고용)
  * @returns {Promise<import('../types.js').AnalystResult>}
  */
-export async function analyzeInvestment(summaryResult, marketContext = []) {
+export async function analyzeInvestment(summaryResult, marketContext = [], pickHistory = []) {
   assertValidSummaryResult(summaryResult);
 
   const client = createGeminiClient();
   const systemInstruction = buildSystemPrompt();
-  const userPrompt = buildUserPrompt(summaryResult, marketContext);
+  const userPrompt = buildUserPrompt(summaryResult, marketContext, pickHistory);
 
   let response;
   try {
@@ -60,6 +62,11 @@ export async function analyzeInvestment(summaryResult, marketContext = []) {
             responseMimeType: 'application/json',
             responseSchema: ANALYSIS_RESPONSE_SCHEMA,
             maxOutputTokens: 16384,
+            // 판단 이력을 참고해 일관성을 유지하길 바라는데, 기본 temperature(~1.0)는 같은
+            // 근거를 줘도 매번 결과가 흔들릴 정도로 변동폭이 크다. 그렇다고 너무 낮추면
+            // (예: 0) 문장이 매번 판박이처럼 반복되어 부자연스러워지므로, 어느 정도 일관성은
+            // 확보하면서도 서술이 딱딱해지지 않는 중간값으로 설정한다.
+            temperature: 0.4,
           },
         }),
       { label: 'analyst' }
