@@ -11,6 +11,7 @@ import { collectNews } from './collectors/index.js';
 import { summarizeNews } from './summarizer/index.js';
 import { analyzeInvestment } from './analyst/index.js';
 import { enrichPicksWithPriceData } from './priceData/index.js';
+import { buildMarketContext } from './priceData/marketContext.js';
 import { generateReport, saveReportToFile } from './reporter/index.js';
 import { sendDailyReport, scheduleDailyRun } from './notifier/index.js';
 
@@ -39,7 +40,12 @@ export async function runDailyPipeline() {
   const summaryResult = await summarizeNews(newsItems);
   console.log('[news-bot] 2/4 요약 완료');
 
-  const analystResult = await analyzeInvestment(summaryResult);
+  // analyst가 종목을 고르기 "전에" 참고할 실제 시세/밸류에이션/변동성 데이터를 준비한다
+  // (Gemini 호출 없이 KRX 종목명 매칭 + 무료 시세 API만 사용, 실패해도 빈 배열로 계속 진행).
+  const marketContext = await buildMarketContext(newsItems);
+  console.log(`[news-bot] 시장 데이터 준비: ${marketContext.length}개 종목 참고 데이터 확보`);
+
+  const analystResult = await analyzeInvestment(summaryResult, marketContext);
   console.log(`[news-bot] 3/4 투자 분석 완료: 종목 ${analystResult.picks?.length ?? 0}건`);
 
   // 뉴스 텍스트만으로는 "이미 주가에 반영됐는지" 알 수 없어서, 실제 시세(무료 Yahoo Finance)를

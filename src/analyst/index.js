@@ -37,14 +37,16 @@ function assertValidSummaryResult(summaryResult) {
 
 /**
  * @param {import('../types.js').SummaryResult} summaryResult
+ * @param {import('../priceData/marketContext.js').MarketContextEntry[]} [marketContext] - 오늘
+ *   뉴스에 언급된 종목의 실제 시세/밸류에이션/변동성 (picks 결정 전 판단 근거로 제공)
  * @returns {Promise<import('../types.js').AnalystResult>}
  */
-export async function analyzeInvestment(summaryResult) {
+export async function analyzeInvestment(summaryResult, marketContext = []) {
   assertValidSummaryResult(summaryResult);
 
   const client = createGeminiClient();
   const systemInstruction = buildSystemPrompt();
-  const userPrompt = buildUserPrompt(summaryResult);
+  const userPrompt = buildUserPrompt(summaryResult, marketContext);
 
   let response;
   try {
