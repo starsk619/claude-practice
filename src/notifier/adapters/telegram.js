@@ -60,4 +60,6 @@ export const telegramAdapter = {
   name: 'telegram',
   sendText,
   sendFile,
+  // sendDocument로 실제 HTML 파일을 첨부할 수 있다.
+  supportsFileAttachment: true,
 };

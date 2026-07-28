@@ -30,9 +30,13 @@ export function buildHeadline(analystResult) {
   return `오늘의 한줄 결론: ${headline}`;
 }
 
+/** buildShortDigest에서 등급별 줄을 만들 때 사용하는 표시 순서 */
+const RATING_ORDER = ['매수 고려', '관망', '주의'];
+
 /**
- * Slack/Telegram에 보낼 짧은 다이제스트(3~5줄)를 만든다.
- * 1줄: 날짜+타이틀, 2줄: 한줄 결론, 3~5줄: 상위 종목 최대 3개(신호등 이모지 포함).
+ * Slack/Telegram/카카오에 보낼 짧은 다이제스트를 만든다.
+ * 1줄: 날짜+타이틀, 2줄: 한줄 결론, 3~5줄: 등급(매수 고려/관망/주의)별 신호등 이모지 +
+ * 종목명 목록 한 줄씩 (등급 텍스트를 반복하지 않고 색으로만 구분해 짧고 깔끔하게 유지).
  * @param {import('../types.js').SummaryResult} [summaryResult]
  * @param {import('../types.js').AnalystResult} [analystResult]
  * @returns {string}
@@ -44,13 +48,15 @@ export function buildShortDigest(summaryResult, analystResult) {
 
   lines.push(buildHeadline(analystResult));
 
-  const topPicks = (analystResult?.picks ?? []).slice(0, 3);
-  for (const pick of topPicks) {
-    const style = RATING_STYLE[pick?.rating];
-    const emoji = style ? style.emoji : '⚪';
-    lines.push(`${emoji} ${pick?.name ?? '종목명 미상'}(${pick?.ticker ?? '-'}) - ${pick?.rating ?? '정보 없음'}`);
+  const picks = analystResult?.picks ?? [];
+  for (const rating of RATING_ORDER) {
+    const names = picks
+      .filter((pick) => pick?.rating === rating)
+      .map((pick) => pick?.name ?? '종목명 미상');
+    if (!names.length) continue;
+    const style = RATING_STYLE[rating];
+    lines.push(`${style.emoji} ${names.join(', ')}`);
   }
 
-  // 최대 5줄만 발송 (헤더 1 + 결론 1 + 종목 최대 3)
-  return lines.slice(0, 5).join('\n');
+  return lines.join('\n');
 }

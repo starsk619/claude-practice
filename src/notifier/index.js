@@ -39,9 +39,11 @@ export async function sendMessage(channel, payload) {
 
 /**
  * 오늘의 리포트를 여러 채널에 발송한다.
- * 1) 짧은 헤드라인 다이제스트(3~5줄) 텍스트 발송
- * 2) 생성된 HTML 리포트 파일 첨부 발송 (파일 첨부를 지원하지 않는 채널은 reportUrl이 있으면
- *    링크로, 없으면 안내 텍스트로 각자 알아서 대체 처리 - 어댑터별 sendFile 구현에 위임)
+ * - 실제 파일 첨부가 가능한 채널(slack/telegram, adapter.supportsFileAttachment === true):
+ *   1) 짧은 헤드라인 다이제스트 텍스트 발송 2) HTML 리포트 파일 첨부 발송 (두 메시지 모두 의미가 다름)
+ * - 파일 첨부가 불가능한 채널(카카오 등): 다이제스트 텍스트 1건만 발송한다. sendText가 이미
+ *   reportUrl로 가는 링크 버튼을 붙이므로, 별도 sendFile 호출은 같은 링크를 또 보내는
+ *   중복 메시지가 되어 생략한다.
  * 한 채널이 실패해도 나머지 채널 발송은 계속 진행한다(부분 실패 허용).
  *
  * @param {{
@@ -68,12 +70,16 @@ export async function sendDailyReport({ channels, summaryResult, analystResult, 
   for (const channel of channels) {
     try {
       await sendMessage(channel, { text: digest });
-      await sendMessage(channel, {
-        filePath: reportPath,
-        filename,
-        caption: '오늘의 상세 리포트입니다.',
-        url: reportUrl,
-      });
+
+      const adapter = getChannel(channel);
+      if (adapter.supportsFileAttachment) {
+        await sendMessage(channel, {
+          filePath: reportPath,
+          filename,
+          caption: '오늘의 상세 리포트입니다.',
+          url: reportUrl,
+        });
+      }
       results.push({ channel, ok: true });
     } catch (err) {
       console.error(`[notifier] "${channel}" 채널 발송 실패:`, err);

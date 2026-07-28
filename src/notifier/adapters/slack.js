@@ -99,4 +99,6 @@ export const slackAdapter = {
   name: 'slack',
   sendText,
   sendFile,
+  // Bot Token이 설정된 경우 files.* API로 실제 HTML 파일을 첨부할 수 있다.
+  supportsFileAttachment: true,
 };

@@ -111,6 +111,7 @@ async function sendText(text) {
     object_type: 'text',
     text: truncated,
     link: { web_url: link, mobile_web_url: link },
+    button_title: '📄 리포트 보기',
   });
 }
 
@@ -140,4 +141,8 @@ export const kakaoAdapter = {
   name: 'kakao',
   sendText,
   sendFile,
+  // 카카오 메모 API는 실제 파일 첨부가 불가능해서 sendFile도 결국 "링크가 붙은 텍스트
+  // 메시지"일 뿐이다. sendText가 이미 같은 링크를 붙이므로, notifier가 이 값을 보고
+  // sendFile 호출(중복 메시지)을 건너뛴다.
+  supportsFileAttachment: false,
 };
