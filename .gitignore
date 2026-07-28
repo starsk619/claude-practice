@@ -1,0 +1,18 @@
+# macOS 시스템 파일
+.DS_Store
+
+# 에디터 / IDE
+.idea/
+
+# Node
+node_modules/
+
+# 환경 변수 (시크릿 포함, 절대 커밋하지 않음)
+.env
+
+# 로그
+*.log
+
+# 자동 생성되는 리포트 (폴더 구조만 유지)
+reports/*.html
+!reports/.gitkeep

@@ -1,0 +1,22 @@
+{
+  "name": "news-bot",
+  "version": "1.0.0",
+  "description": "AI 뉴스 및 주식 뉴스를 매일 수집/요약/분석하여 Slack·Telegram으로 알리는 봇",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "check-secrets": "node scripts/check-secrets.js",
+    "kakao:auth": "node scripts/kakao-auth.js",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@google/genai": "^2.13.0",
+    "dotenv": "^16.4.5",
+    "node-cron": "^3.0.3",
+    "rss-parser": "^3.13.0"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}

@@ -1,0 +1,196 @@
+# notifier / reporter 모듈
+
+## 1. 목적
+
+`news-bot-team` 파이프라인은 `collector → summarizer → analyst → notifier/reporter` 순서로
+데이터를 넘긴다. 이 중 마지막 단계인 `reporter`와 `notifier`는 다음 문제를 해결한다.
+
+- **왜 필요한가**: `analyst`까지 만들어진 `SummaryResult`/`AnalystResult`는 구조화된
+  데이터일 뿐, 사람이 바로 읽을 수 있는 형태가 아니다. 특히 "뉴스를 잘 안 읽거나
+  투자를 잘 모르는 사람"도 매일 아침 한눈에 결론(오늘 뭘 보면 되는지)을 파악할 수 있어야
+  한다는 요구가 있었다.
+- **무엇을 해결하는가**:
+  - `reporter`: `SummaryResult` + `AnalystResult` → 보기 쉬운 self-contained HTML 리포트
+    (신호등 배지, 단기/장기 전망 표, 용어 설명, 면책 문구 등 매일 동일한 구조)로 변환.
+  - `notifier`: 그 리포트를 실제로 사람에게 전달한다. 메신저(Slack/Telegram)에는
+    스크롤 없이 읽을 수 있는 짧은 헤드라인만, 상세 내용은 HTML 파일 첨부로 분리해서
+    "메시지가 길어지면 안 읽는다"는 우려를 해소한다. 또한 `node-cron`으로 매일 정해진
+    시각에 자동 실행되도록 스케줄링한다.
+- **팀 내 위치**: 공유 계약(`src/types.js`)의 `SummaryResult`/`AnalystResult`를
+  **입력으로만** 소비하며, 그 계약이나 `collector`/`summarizer`/`analyst`/`scripts`/`docs`의
+  다른 문서/파일은 건드리지 않는다. `src/notifier/`, `src/reporter/`, 그리고 본 문서
+  (`docs/notifier.md`)만 소유한다.
+
+## 2. 세부 진행 내역
+
+### 파일 구성
+
+| 파일 | 역할 |
+|---|---|
+| `src/reporter/index.js` | `generateReport(summaryResult, analystResult)` — HTML 리포트 생성. `saveReportToFile(html, options)`로 파일 저장. |
+| `src/reporter/htmlUtils.js` | `escapeHtml`, `escapeAndBreak`, `formatKoreanDate`, `formatShortDate` — XSS 방지용 이스케이프 및 날짜 포맷 유틸. |
+| `src/reporter/ratings.js` | `StockPick.rating`(매수 고려/관망/주의) → 신호등 색상(초록/노랑/빨강) 매핑, 확신도(강함/중간/약함) → 점(●) 표시 매핑. |
+| `src/reporter/headline.js` | `buildHeadline(analystResult)` — 전문용어 없는 한줄 결론 생성. `buildShortDigest(summaryResult, analystResult)` — 메신저용 3~5줄 다이제스트 생성. `countByRating(picks)` — rating별 개수 집계. |
+| `src/notifier/index.js` | 모듈 진입점. `sendMessage(channel, payload)`, `sendDailyReport({channels, summaryResult, analystResult, reportPath})` export. |
+| `src/notifier/channels.js` | 채널 어댑터 레지스트리(`registerChannel`, `getChannel`, `listChannels`) — 공통 인터페이스로 채널 추가/교체 가능. |
+| `src/notifier/adapters/slack.js` | Slack 어댑터 (`sendText`/`sendFile`). |
+| `src/notifier/adapters/telegram.js` | Telegram 어댑터 (`sendText`/`sendFile`). |
+| `src/notifier/adapters/kakao.js` | 카카오톡 "나에게 보내기" 어댑터 (`sendText`/`sendFile`). |
+| `src/notifier/scheduler.js` | `scheduleDailyRun(runFn, options)` — `node-cron` 기반 매일 실행 스케줄러. |
+
+### 함수 시그니처
+
+```js
+// src/reporter/index.js
+/**
+ * @param {SummaryResult} summaryResult
+ * @param {AnalystResult} analystResult
+ * @returns {string} HTML 문서 문자열 (self-contained, 인라인 CSS)
+ */
+export function generateReport(summaryResult, analystResult) { ... }
+
+/**
+ * @param {string} html
+ * @param {{ dir?: string, generatedAt?: string }} [options]
+ * @returns {Promise<string>} 저장된 파일의 절대 경로 (기본: <cwd>/reports/YYYY-MM-DD.html)
+ */
+export async function saveReportToFile(html, options) { ... }
+```
+
+```js
+// src/notifier/index.js
+/**
+ * @param {string} channel - 'slack' | 'telegram' | 'kakao' (추후 다른 채널도 추가 가능)
+ * @param {{ text?: string, filePath?: string, filename?: string, caption?: string }} payload
+ */
+export async function sendMessage(channel, payload) { ... }
+
+/**
+ * @param {{ channels: string[], summaryResult: SummaryResult, analystResult: AnalystResult, reportPath: string }} params
+ * @returns {Promise<Array<{channel: string, ok: boolean, error?: string}>>}
+ */
+export async function sendDailyReport({ channels, summaryResult, analystResult, reportPath }) { ... }
+```
+
+```js
+// src/notifier/scheduler.js
+/**
+ * @param {() => Promise<void> | void} runFn
+ * @param {{ schedule?: string, timezone?: string, runImmediately?: boolean }} [options]
+ * @returns {import('node-cron').ScheduledTask}
+ */
+export function scheduleDailyRun(runFn, options) { ... }
+```
+
+### 리포트 템플릿 구조 (고정 섹션 순서)
+
+`generateReport`가 만드는 HTML은 매일 **아래 순서를 100% 동일하게 유지**한다 — 뉴스나 투자에
+익숙하지 않은 사람도 "오늘은 어디를 보면 되는지"가 매일 같은 자리에서 눈에 들어오게 하기 위함.
+
+1. **최상단 히어로 영역** — 오늘 날짜(한글, 예: "2026년 7월 28일 (화)") + `buildHeadline()`이
+   만든 전문용어 없는 한줄 결론 (예: "오늘의 한줄 결론: 매수 고려 1개, 관망 1개, 주의 1개 —
+   긍정적인 신호가 조금 더 많아요."). 결론이 항상 맨 먼저 나오도록 배치.
+2. **종목별 신호등 배지** — `StockPick[]` 각각을 배지로 렌더링. `ratings.js`의 매핑에 따라
+   매수 고려=초록(`#34a853`), 관망=노랑(`#f9ab00`), 주의=빨강(`#e53935`) 배경/테두리 색 적용.
+   범례(legend)도 함께 표시.
+3. **단기/장기 전망 표** — CSS Grid(`grid-template-columns: 1fr 1fr`)로 두 카드를 나란히 배치
+   (`shortTermOutlook` "1일~1개월" / `longTermOutlook` "6개월~1년+"). 폭이 좁은 화면
+   (`max-width: 560px`)에서는 미디어 쿼리로 세로 스택 전환.
+4. **뉴스 요약 + 애널리스트 근거 상세** — `SummaryResult.categories.ai`/`.stock` 요약 카드,
+   원본 기사 목록(`sourceItems`)은 `<details>` 아코디언(순수 HTML, JS 불필요)으로 접어둠.
+   그 아래 `StockPick`별 근거(`rationale`)/리스크(`risk`)/확신도(`confidence`, ● 점 표시)를
+   신호등 색 테두리 카드로 상세 표시.
+5. **최하단 용어설명 박스 + disclaimer** — "매수 고려/관망/주의/단기 전망/장기 전망/확신도/
+   리스크 요인"을 쉬운 말로 설명하는 용어 박스, 그 아래 `AnalystResult.disclaimer` 문구를
+   그대로 노출하는 노란색 경고 박스("투자 자문이 아닙니다").
+
+모든 동적 텍스트(뉴스 제목, 근거 문구 등)는 `escapeHtml`/`escapeAndBreak`을 거쳐 삽입한다
+(외부 뉴스 텍스트에 HTML 태그가 섞여 있어도 안전). 폰트/이미지/스크립트 등 외부 리소스
+의존 없이 `<style>` 블록 하나에 인라인 CSS만 사용(self-contained).
+
+### Slack/Telegram 발송 구현 방식
+
+공통 인터페이스: 모든 어댑터는 `{ name, sendText(text), sendFile({filename, caption, fileBuffer}) }`
+형태를 따른다. `channels.js`가 이름→어댑터 레지스트리 역할을 하며, `sendMessage(channel, payload)`가
+`payload.filePath` 유무로 텍스트/파일 발송을 분기한다. `sendDailyReport()`는
+`buildShortDigest()`로 만든 3~5줄 헤드라인을 먼저 보내고, 이어서 `saveReportToFile()`로
+저장된 HTML 파일을 첨부 발송한다. 채널 하나가 실패해도 나머지 채널은 계속 시도(부분 실패 허용).
+
+- **Telegram** (`adapters/telegram.js`): `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`만으로
+  `sendMessage`(텍스트)와 `sendDocument`(파일, `multipart/form-data` via 네이티브 `FormData`/`Blob`)를
+  모두 지원 — 계약된 env만으로 요구사항을 100% 만족.
+- **Slack** (`adapters/slack.js`): 텍스트는 `SLACK_WEBHOOK_URL`(Incoming Webhook)로 발송.
+  **주의**: Slack Incoming Webhook은 플랫폼 자체적으로 파일 업로드를 지원하지 않는다.
+  실제 파일 첨부(`files.getUploadURLExternal` → 업로드 → `files.completeUploadExternal`
+  3단계 플로우)를 하려면 Bot Token이 필요해, 선택적으로 `process.env.SLACK_BOT_TOKEN`/
+  `process.env.SLACK_CHANNEL_ID`를 추가로 읽도록 구현했다. 이 두 값은 `.env.example`에는
+  아직 없음(이 파일은 수정 범위 밖) — 정식으로 쓰려면 리더가 `.env.example`에 추가할지
+  결정 필요. 값이 없으면 에러로 전체를 죽이지 않고, webhook으로 "파일 첨부를 건너뛴다"는
+  안내 텍스트만 보내는 것으로 안전하게 degrade 한다.
+- 모든 토큰/웹훅 URL은 `process.env`로만 읽으며, 코드에 하드코딩된 값 없음.
+
+### cron 스케줄러 동작
+
+`scheduleDailyRun(runFn, options)`는 `options.schedule ?? process.env.CRON_SCHEDULE ?? '0 8 * * *'`
+순으로 크론 표현식을 결정하고, `node-cron`의 `cron.validate()`로 형식을 검증한 뒤
+(`invalid`면 즉시 에러) `cron.schedule()`로 등록한다. 타임존은
+`options.timezone ?? process.env.CRON_TIMEZONE ?? 'Asia/Seoul'`. 등록된 작업은
+매 스케줄마다 `runFn()`을 호출하며, `runFn` 내부에서 발생한 에러는 `try/catch`로 흡수해
+`console.error`로만 남기고 스케줄러 자체는 죽지 않는다. `options.runImmediately`가 true면
+등록과 별개로 `runFn()`을 즉시 한 번 더 실행(로컬 테스트 편의용).
+
+### 검증한 내용
+
+- `node --check`로 reporter/notifier 전 파일(9개) 문법 오류 없음 확인.
+- 목(mock) `SummaryResult`/`AnalystResult` 데이터로 스모크 테스트 수행:
+  - `generateReport()`가 `<!DOCTYPE html>`로 시작하는 완전한 HTML 문자열을 생성함을 확인.
+  - 뉴스 요약 텍스트에 `<script>` 태그를 섞어 넣어도 이스케이프되어 실행되지 않음을 확인.
+  - `buildShortDigest()`가 정확히 5줄 이하를 반환함을 확인(헤더 1 + 결론 1 + 종목 최대 3).
+  - `saveReportToFile()`이 `YYYY-MM-DD.html` 파일명으로 정상 저장됨을 확인.
+- env 변수 없는 상태에서 `sendMessage('slack', ...)`, `sendMessage('telegram', ...)` 호출 시
+  하드코딩된 값 없이 "환경변수가 설정되지 않았습니다" 형태의 명확한 에러를 던짐을 확인
+  (파이프라인이 알 수 없는 이유로 죽지 않도록 에러 메시지가 원인을 바로 알려줌).
+  존재하지 않는 채널(`'kakao'`) 호출 시에도 등록된 채널 목록을 포함한 명확한 에러 확인.
+  잘못된 크론 표현식(`'not-a-cron'`) 전달 시 즉시 에러, 정상 표현식(`'0 8 * * *'`)은
+  스케줄 등록 및 `task.stop()` 정상 동작 확인.
+- 실제 Slack/Telegram으로의 네트워크 발송 성공 여부(webhook/봇 토큰 유효성 등)는
+  실제 자격 증명이 없어 검증하지 못함 — 요청 구성/에러 처리 경로만 확인됨.
+
+## 3. 변경 이력 (Changelog)
+
+### 2026-07-28 — 최초 구현
+
+- `src/reporter/index.js`, `htmlUtils.js`, `ratings.js`, `headline.js` 최초 작성.
+  `generateReport(summaryResult, analystResult)`로 고정 5단계 구조(한줄 요약 → 신호등 배지 →
+  단기/장기 전망 표 → 뉴스 요약+근거 상세 → 용어설명+disclaimer)의 self-contained HTML 리포트
+  생성 기능 구현, `saveReportToFile()`로 `reports/YYYY-MM-DD.html` 저장 기능 구현.
+- `src/notifier/index.js`, `channels.js`, `scheduler.js`, `adapters/slack.js`,
+  `adapters/telegram.js` 최초 작성. `sendMessage(channel, payload)` 공통 인터페이스로
+  Slack/Telegram 어댑터 분리(카카오 등 추후 채널 추가 시 어댑터 파일 하나 + 레지스트리 등록
+  한 줄로 확장 가능하도록 설계), `sendDailyReport()`로 3~5줄 헤드라인 + HTML 파일 첨부 발송
+  구현, `scheduleDailyRun()`으로 `CRON_SCHEDULE` 기반 `node-cron` 매일 실행 스케줄러 구현.
+- 토큰/웹훅 URL은 전부 `process.env`로만 읽도록 구현(하드코딩 없음). Slack Incoming Webhook의
+  파일 업로드 미지원이라는 플랫폼 제약을 확인하고, Bot Token 기반 업로드로 best-effort 지원 +
+  토큰 없을 시 안전한 텍스트 안내로 degrade하는 방식으로 처리.
+- `node --check` 문법 검증 및 목 데이터 기반 스모크 테스트(HTML 이스케이프, 다이제스트 줄 수,
+  파일 저장, env 누락/미등록 채널/잘못된 크론 표현식에 대한 에러 처리) 완료.
+
+### 2026-07-28 — 카카오톡 "나에게 보내기" 채널 추가
+- 사용자가 회사 Slack/Teams 접속이 막혀(관리자 승인 필요 추정) 카카오톡을 알림 채널로 선택 (리더가 직접 작업).
+- `src/notifier/adapters/kakao.js` 신규 작성: Kakao Login의 `refresh_token`으로 매 발송 시 `access_token`을 새로 발급받아 `https://kapi.kakao.com/v2/api/talk/memo/default/send`로 text 템플릿 전송. 처음 설계했던 `sendMessage(channel, payload)` 공통 인터페이스에 그대로 꽂아 넣기만 하면 됐음(설계 의도대로 확장 가능함을 확인).
+- 카카오 메모 API는 파일 첨부를 지원하지 않아, `sendFile()`은 Slack의 파일첨부 제약과 동일한 패턴으로 "리포트가 로컬에 저장됐다"는 안내 텍스트로 degrade.
+- `scripts/kakao-auth.js` 신규 작성: Kakao Login(OAuth) 최초 1회 인증(로컬 콜백 서버로 authorization code 수신 → token 교환)을 사람이 브라우저로 진행하게 돕는 1회성 CLI. 이후로는 `kakao.js` 어댑터가 `refresh_token`으로 자동 갱신하므로 재실행 불필요.
+- API 스펙(엔드포인트, 헤더, OAuth 파라미터)은 추측하지 않고 developers.kakao.com 공식 문서를 직접 확인 후 구현.
+- `channels.js`에 등록, `.env.example`/`src/config.js`(env 검증에 kakao 조합 추가)/`scripts/check-secrets.js`(민감 키 목록에 추가)/`src/index.js`(활성 채널 판단) 반영.
+- `KAKAO_REST_API_KEY`/`KAKAO_REFRESH_TOKEN` 없는 상태에서 어댑터가 명확한 에러를 던지는지 재검증 완료.
+
+### 2026-07-28 — 리포트 공개 링크(GitHub Pages) 지원 + 고정 파일명으로 변경
+- 카카오는 파일 첨부가 안 되므로, 대신 공개 링크(GitHub Pages 등)를 보낼 수 있도록 배선 (리더가 직접 작업).
+- `reporter.saveReportToFile()`이 이제 두 파일을 함께 저장: 날짜별 이력 파일(`reports/YYYY-MM-DD.html`, 로컬 보관용)과 매일 덮어써지는 고정 파일 `reports/daily-briefing.html`(공개 배포용 — 이 파일만 배포하면 외부에는 항상 "오늘 것"만 보이고 과거 이력은 노출 안 됨). 반환값이 `string`에서 `{ historyPath, latestPath }`로 변경(호출부인 `src/index.js`도 함께 수정).
+- `sendMessage(channel, payload)`/`sendDailyReport(...)`에 `url` / `reportUrl` 파라미터 추가 → 파일 첨부가 안 되는 채널(kakao)의 `sendFile()`이 이 url을 받아 링크 형태로 대체 발송할 수 있게 함. Slack/Telegram은 그대로 실제 파일을 첨부(추가 파라미터는 그냥 무시됨).
+- `src/config.js`에 `REPORT_PUBLIC_URL`(선택) 추가 — 값이 있으면 `runDailyPipeline()`이 `sendDailyReport`에 넘겨줌.
+- 파일명은 원래 `latest.html`이었으나 사용자 피드백으로 `daily-briefing.html`로 변경 (`LATEST_REPORT_FILENAME` 상수 하나만 바꾸면 되도록 설계).
+- Mock 채널로 두 파일이 실제로 다르게 저장되는지, `reportUrl`이 어댑터의 `sendFile`까지 정확히 전달되는지 end-to-end 검증 완료.
+- GitHub Pages 활성화 자체(저장소 Settings → Pages)는 사람이 웹 UI에서 직접 해야 하는 수동 단계라 이 세션에서 대신 해줄 수 없음 — `docs/kakao-setup.md`에 안내 추가.
+
+<!-- 이 모듈을 수정할 때마다 아래에 "### YYYY-MM-DD — 변경 요약" 형식으로 새 항목을 추가할 것 -->
