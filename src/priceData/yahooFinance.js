@@ -86,8 +86,19 @@ export async function fetchPriceInfo(code, suffix) {
     const high52w = validCloses.length ? Math.max(...validCloses) : null;
     const low52w = validCloses.length ? Math.min(...validCloses) : null;
 
-    // 코스피/코스닥 상하한가(±30%)를 넘는 등락률은 기업행위/데이터 오류로 보고 제외한다.
-    const previousClose = meta.chartPreviousClose ?? meta.previousClose;
+    // meta.chartPreviousClose는 "전일 종가"가 아니라 "조회 range 시작 직전 종가"라
+    // range를 바꾸면 비교 기준 시점이 통째로 바뀌어버린다(range=1y일 땐 1년 전과 비교하는
+    // 셈이 되어 거의 모든 종목이 이상치로 잡히는 문제가 있었음). 그래서 range와 무관하게
+    // 항상 "어제 종가"를 가리키도록, 직접 받아온 일별 종가 배열의 마지막 두 값을 쓴다.
+    // (currentPrice가 이미 마지막 종가와 거의 같다면 그 값은 "오늘자"이므로 한 칸 더 앞을 쓴다.)
+    const lastClose = validCloses[validCloses.length - 1];
+    const lastCloseIsToday =
+      typeof lastClose === 'number' &&
+      lastClose !== 0 &&
+      Math.abs(lastClose - currentPrice) / lastClose < 0.005;
+    const previousClose = lastCloseIsToday
+      ? validCloses[validCloses.length - 2]
+      : validCloses[validCloses.length - 1];
     let changePercent =
       typeof previousClose === 'number' && previousClose !== 0
         ? ((currentPrice - previousClose) / previousClose) * 100
