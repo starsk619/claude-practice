@@ -12,13 +12,16 @@ import { summarizeNews } from './summarizer/index.js';
 import { analyzeInvestment } from './analyst/index.js';
 import { enrichPicksWithPriceData } from './priceData/index.js';
 import { buildMarketContext } from './priceData/marketContext.js';
+import { findSectorConcentration } from './priceData/portfolioRisk.js';
 import {
   derivePickHistoryUrl,
   fetchPickHistory,
   buildHistoryEntry,
   appendPickHistory,
   savePickHistoryToFile,
+  PROMPT_HISTORY_ENTRIES,
 } from './pickHistory/index.js';
+import { computeTrackRecord } from './pickHistory/trackRecord.js';
 import { generateReport, saveReportToFile } from './reporter/index.js';
 import { sendDailyReport, scheduleDailyRun } from './notifier/index.js';
 
@@ -58,7 +61,13 @@ export async function runDailyPipeline() {
   const pickHistory = await fetchPickHistory(pickHistoryUrl);
   console.log(`[news-bot] 판단 이력 조회: 최근 리포트 ${pickHistory.length}건 확보`);
 
-  const analystResult = await analyzeInvestment(summaryResult, marketContext, pickHistory);
+  // analyst 프롬프트에는 이력 전체가 아니라 최근 것만 넘긴다(프롬프트 길이 폭주 방지 -
+  // 전체 이력은 트랙레코드 검증(아래 computeTrackRecord)에 필요해서 별도로 더 오래 보관한다).
+  // 두 호출 다 marketContext/pickHistory만 있으면 되는 독립적인 작업이라 동시에 실행한다.
+  const [analystResult, trackRecord] = await Promise.all([
+    analyzeInvestment(summaryResult, marketContext, pickHistory.slice(-PROMPT_HISTORY_ENTRIES)),
+    computeTrackRecord(pickHistory, marketContext),
+  ]);
   console.log(`[news-bot] 3/4 투자 분석 완료: 종목 ${analystResult.picks?.length ?? 0}건`);
 
   // 뉴스 텍스트만으로는 "이미 주가에 반영됐는지" 알 수 없어서, 실제 시세(무료 Yahoo Finance)를
@@ -66,7 +75,9 @@ export async function runDailyPipeline() {
   // 조회하면 그 사이 가격이 바뀌어 카드 안 시세가 어긋나는 문제가 있었음), 없는 종목만 새로
   // 조회한다. 종목명이 KRX 목록에 없거나 시세 조회가 실패해도 파이프라인은 계속 진행된다.
   const enrichedPicks = await enrichPicksWithPriceData(analystResult.picks, marketContext);
-  const analystResultWithPrices = { ...analystResult, picks: enrichedPicks };
+  // "매수 고려" 종목들이 특정 섹터에 몰려있는지(포트폴리오 레벨 집중 리스크) 점검한다.
+  const sectorConcentration = findSectorConcentration(enrichedPicks);
+  const analystResultWithPrices = { ...analystResult, picks: enrichedPicks, sectorConcentration, trackRecord };
 
   // 이번 판단 결과를 이력에 추가해서 저장해두면, 다음 실행(내일 08:00) 때 다시 읽어와
   // "지난번엔 이 종목을 뭐라고 판단했는지" 참고할 수 있다. 리포트 파일과 함께 GitHub

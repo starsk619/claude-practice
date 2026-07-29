@@ -53,6 +53,7 @@ function buildWatchlistCandidates(existingCodes) {
  * @property {number|null} forwardPer
  * @property {number|null} pbr
  * @property {number|null} dividendYield
+ * @property {number|null} foreignOwnershipRate
  */
 
 /**

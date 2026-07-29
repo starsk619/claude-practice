@@ -30,6 +30,8 @@ function formatMarketContextEntry(entry, index) {
   const forwardPer = typeof entry.forwardPer === 'number' ? `${entry.forwardPer}배` : '정보 없음';
   const pbr = typeof entry.pbr === 'number' ? `${entry.pbr}배` : '정보 없음';
   const dividendYield = typeof entry.dividendYield === 'number' ? `${entry.dividendYield}%` : '정보 없음';
+  const foreignOwnershipRate =
+    typeof entry.foreignOwnershipRate === 'number' ? `${entry.foreignOwnershipRate}%` : '정보 없음';
 
   const mentionLabel = entry.mentionCount > 0 ? `오늘 뉴스 언급 ${entry.mentionCount}회` : '핵심 관심 종목(오늘 뉴스 언급 없음)';
 
@@ -37,7 +39,8 @@ function formatMarketContextEntry(entry, index) {
     `${index + 1}. ${entry.name}(${entry.code}) - ${mentionLabel}\n` +
     `   현재가: ${fmt(entry.currentPrice)}${entry.currency ?? ''} (전일대비 ${change}), ` +
     `52주 ${fmt(entry.low52w)}~${fmt(entry.high52w)}\n` +
-    `   연환산 변동성: ${vol} | PER: ${per} (추정PER: ${forwardPer}) | PBR: ${pbr} | 배당수익률: ${dividendYield}`
+    `   연환산 변동성: ${vol} | PER: ${per} (추정PER: ${forwardPer}) | PBR: ${pbr} | ` +
+    `배당수익률: ${dividendYield} | 외국인 보유율: ${foreignOwnershipRate}`
   );
 }
 

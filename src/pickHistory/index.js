@@ -14,7 +14,12 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const HISTORY_FILENAME = 'pick-history.json';
-const DEFAULT_MAX_ENTRIES = 7; // 최근 일주일치 리포트 정도만 유지 (프롬프트 길이 폭주 방지)
+// trackRecord.js가 "1개월 전 판단"까지 대사해야 해서 최소 한 달치(+테스트로 하루에 여러 번
+// 돌리는 경우의 여유분)는 남겨둔다. analyst 프롬프트에는 이 전체를 넘기지 않고 최근 일부만
+// 잘라서 넘긴다(index.js 참고 - 프롬프트 길이 폭주 방지는 그쪽에서 처리).
+const DEFAULT_MAX_ENTRIES = 40;
+// analyst 프롬프트에 넣어줄 "최근 판단 이력"은 이보다 훨씬 적게(최근 것만) 잘라서 쓴다.
+export const PROMPT_HISTORY_ENTRIES = 7;
 
 /**
  * @typedef {Object} PickHistoryPick

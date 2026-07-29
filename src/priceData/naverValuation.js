@@ -23,7 +23,7 @@ function parseKoreanNumber(raw) {
 
 /**
  * @param {string} code - 6자리 종목코드 (코스피/코스닥만 해당, 해외 종목은 지원 안 함)
- * @returns {Promise<{ per: number|null, forwardPer: number|null, eps: number|null, pbr: number|null, bps: number|null, dividendYield: number|null } | null>}
+ * @returns {Promise<{ per: number|null, forwardPer: number|null, eps: number|null, pbr: number|null, bps: number|null, dividendYield: number|null, foreignOwnershipRate: number|null } | null>}
  */
 export async function fetchValuationInfo(code) {
   if (!code) return null;
@@ -50,6 +50,9 @@ export async function fetchValuationInfo(code) {
       pbr: parseKoreanNumber(byCode.pbr),
       bps: parseKoreanNumber(byCode.bps),
       dividendYield: parseKoreanNumber(byCode.dividendYieldRatio),
+      // 외국인 보유율: 단순 %라 parseKoreanNumber로 안전하게 파싱 가능(시가총액은 "1,286조
+      // 1,813억"처럼 조/억 단위가 섞여 있어 이 파서로 지원 안 함 - 사용처 없음 주석 참고).
+      foreignOwnershipRate: parseKoreanNumber(byCode.foreignRate),
     };
   } catch (error) {
     console.warn(`[priceData] "${code}" 밸류에이션 조회 중 오류:`, error?.message ?? error);
