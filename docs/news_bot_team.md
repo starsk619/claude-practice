@@ -30,6 +30,8 @@
 | analyst | `src/analyst/` | `SummaryResult` → 투자 전문가 분석 (`AnalystResult`) |
 | notifier | `src/notifier/`, `src/reporter/` | HTML 리포트 생성 + Slack/Telegram/카카오톡 발송 + cron 스케줄 |
 | security | `.env.example`, `scripts/`, `docs/SECURITY.md` | 시크릿 보호 장치, env 검증 |
+| priceData (리더 직접 작업, 최초 5인 팀 이후 추가) | `src/priceData/` | 실제 시세/밸류에이션/변동성 데이터 조회(Yahoo Finance, 네이버 금융) + 핵심 관심 종목 워치리스트 + 섹터 집중도 점검. [priceData.md](priceData.md) |
+| pickHistory (리더 직접 작업, 최초 5인 팀 이후 추가) | `src/pickHistory/` | 판단 이력 저장/조회 + 1주일/1개월 트랙레코드(적중률) 검증. [pickHistory.md](pickHistory.md) |
 
 공유 계약은 [src/types.js](../src/types.js)에 JSDoc으로 정의(리더가 사전 작성) — 각 팀원은 이 계약만 보고 독립적으로 구현해 파일 충돌 없이 병렬 작업.
 

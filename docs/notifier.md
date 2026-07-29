@@ -193,4 +193,21 @@ export function scheduleDailyRun(runFn, options) { ... }
 - Mock 채널로 두 파일이 실제로 다르게 저장되는지, `reportUrl`이 어댑터의 `sendFile`까지 정확히 전달되는지 end-to-end 검증 완료.
 - GitHub Pages 활성화 자체(저장소 Settings → Pages)는 사람이 웹 UI에서 직접 해야 하는 수동 단계라 이 세션에서 대신 해줄 수 없음 — `docs/kakao-setup.md`에 안내 추가.
 
+### 2026-07-29 — 리포트에 "리스크 참고" 섹션 추가 (섹터 집중도 + 트랙레코드)
+- 투자 자문자료로서의 완성도를 보완하는 작업(자세한 배경은 `docs/priceData.md`,
+  `docs/pickHistory.md` 참고)의 일환으로, 종목 하나하나의 손절선과는 별개인 **포트폴리오 레벨**
+  참고 정보 두 가지를 리포트에 추가.
+- `src/reporter/index.js`에 `renderRiskNotes(analystResult)` 신규 작성 — 배지 섹션
+  (`renderBadges`) 바로 아래 "리스크 참고" 섹션으로 삽입.
+  - `renderSectorConcentration(sectorConcentration)`: 오늘 "매수 고려" 종목이 같은 섹터에
+    몰려 있으면(`src/priceData/portfolioRisk.js`의 `findSectorConcentration` 결과) 경고
+    문구 + 종목 목록을 표시.
+  - `renderTrackRecord(trackRecord)`: 1주일/1개월 전 판단의 적중률·평균 수익률
+    (`src/pickHistory/trackRecord.js`의 `computeTrackRecord` 결과)을 표시.
+  - 둘 다 데이터가 없으면(첫 실행, 대사할 과거 기록 없음 등) 함수가 빈 문자열을 반환해
+    섹션 자체가 생략되도록 처리(불필요한 빈 박스가 뜨지 않음).
+- `.risk-note`/`.concentration-note`/`.track-record-note` CSS 클래스 추가(경고색/참고색 배경).
+- GitHub Actions 실제 실행으로 두 섹션이 실제 데이터와 함께 렌더링되는지, 데이터가 없는
+  케이스(트랙레코드용 과거 기록이 아직 없는 초기 상태)에서 섹션이 정상적으로 생략되는지 확인.
+
 <!-- 이 모듈을 수정할 때마다 아래에 "### YYYY-MM-DD — 변경 요약" 형식으로 새 항목을 추가할 것 -->
