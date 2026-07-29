@@ -45,6 +45,16 @@ function formatMarketContextEntry(entry, index) {
 }
 
 /**
+ * @param {import('../priceData/fxContext.js').FxContext} fx
+ */
+function formatFxContext(fx) {
+  const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('ko-KR') : '정보 없음');
+  const change =
+    typeof fx.changePercent === 'number' ? `${fx.changePercent > 0 ? '+' : ''}${fx.changePercent}%` : '정보 없음';
+  return `원/달러 환율: ${fmt(fx.currentPrice)}원 (전일대비 ${change}), 52주 ${fmt(fx.low52w)}~${fmt(fx.high52w)}원`;
+}
+
+/**
  * @param {import('../pickHistory/index.js').PickHistoryEntry} entry
  */
 function formatPickHistoryEntry(entry) {
@@ -83,9 +93,11 @@ function formatSourceItem(item, index) {
  *   뉴스에 언급된 종목 + 핵심 관심 종목의 실제 시세/밸류에이션/변동성 데이터 (없으면 빈 배열)
  * @param {import('../pickHistory/index.js').PickHistoryEntry[]} [pickHistory] - 최근 리포트에서
  *   실제로 어떤 종목을 어떻게 판단했는지 이력 (없으면 빈 배열 - 첫 실행 등)
+ * @param {import('../priceData/fxContext.js').FxContext | null} [fxContext] - 원/달러 환율
+ *   (조회 실패 시 null)
  * @returns {string}
  */
-export function buildUserPrompt(summaryResult, marketContext = [], pickHistory = []) {
+export function buildUserPrompt(summaryResult, marketContext = [], pickHistory = [], fxContext = null) {
   const now = new Date().toISOString();
   const categories = summaryResult.categories || {};
   const sourceItems = Array.isArray(summaryResult.sourceItems) ? summaryResult.sourceItems : [];
@@ -111,6 +123,8 @@ export function buildUserPrompt(summaryResult, marketContext = [], pickHistory =
     ? marketContext.map(formatMarketContextEntry).join('\n')
     : '(오늘 뉴스에서 KRX 상장기업명이 조회 가능한 형태로 언급되지 않았거나, 시세 조회에 실패했습니다.)';
 
+  const fxBlock = fxContext ? formatFxContext(fxContext) : '(환율 조회에 실패했습니다.)';
+
   const pickHistoryBlock = pickHistory.length
     ? pickHistory.map(formatPickHistoryEntry).join('\n\n')
     : '(최근 리포트 이력이 없습니다 — 이번이 사실상 첫 판단입니다.)';
@@ -119,6 +133,13 @@ export function buildUserPrompt(summaryResult, marketContext = [], pickHistory =
 이 시각을 기준으로 "단기(1일~1개월)"와 "장기(6개월~1년 이상)"를 계산하세요.
 
 ${categorySections}
+
+## 오늘의 원/달러 환율 (거시 배경 지표)
+${fxBlock}
+원화 약세(환율 상승)는 반도체/자동차/조선 등 수출 비중이 큰 종목의 실적에 우호적일 수 있고,
+동시에 외국인 자금 이탈 압력으로 이어질 수 있습니다(아래 각 종목의 외국인 보유율과 함께
+해석하세요). 반대로 원화 강세(환율 하락)는 수출 채산성엔 부담이지만 외국인 자금 유입엔
+우호적일 수 있습니다. 데이터가 없거나 변동이 미미하면 억지로 의미를 부여하지 마세요.
 
 ## 오늘 뉴스에 언급된 종목 + 핵심 관심 종목의 실제 시세/밸류에이션/변동성 (판단 근거로 활용)
 아래는 뉴스 텍스트가 아니라 실제 시장 데이터입니다. "핵심 관심 종목" 표시가 붙은 종목은

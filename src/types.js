@@ -53,6 +53,8 @@
  * @property {string} longTermOutlook - 6개월~1년+ 전망(근거 포함)
  * @property {StockPick[]} picks
  * @property {string} disclaimer - 투자 자문이 아니라는 면책 문구
+ * @property {import('./priceData/fxContext.js').FxContext | null} [fxContext] - 원/달러 환율
+ *   (조회 실패 시 null)
  */
 
 export {};

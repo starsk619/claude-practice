@@ -14,7 +14,7 @@ export { buildHeadline, buildShortDigest, countByRating } from './headline.js';
  *
  * 매일 아래 구조를 100% 동일하게 유지한다(뉴스/투자에 익숙하지 않은 사람도
  * "오늘은 어디를 보면 되는지" 눈에 바로 들어오게 하기 위함):
- *   1. 최상단 - 오늘의 한줄 요약 (결론부터, 전문용어 없이)
+ *   1. 최상단 - 오늘의 한줄 요약 (결론부터, 전문용어 없이) + 원/달러 환율(거시 배경, 조회 실패 시 생략)
  *   2. 종목별 신호등 배지 (매수 고려=초록 / 관망=노랑 / 주의=빨강)
  *   3. 단기 전망 vs 장기 전망 표 (나란히 배치)
  *   4. 뉴스 요약 + 애널리스트 근거 상세
@@ -104,7 +104,31 @@ function renderHeader(dateText, analystResult) {
   <header class="hero">
     <div class="hero-date">${escapeHtml(dateText)}</div>
     <div class="hero-headline">${escapeHtml(headline)}</div>
+    ${renderFxContext(analystResult?.fxContext)}
   </header>`;
+}
+
+/**
+ * 원/달러 환율을 시장 전체의 거시 배경 지표로 매일 같은 위치(헤드라인 바로 아래)에 고정
+ * 표시한다. 조회 실패 시(fxContext가 null) 빈 문자열을 반환해 조용히 생략한다.
+ * @param {import('../priceData/fxContext.js').FxContext | null} [fxContext]
+ */
+function renderFxContext(fxContext) {
+  if (!fxContext || typeof fxContext.currentPrice !== 'number') return '';
+
+  const change = typeof fxContext.changePercent === 'number' ? fxContext.changePercent : null;
+  const changeText = change !== null ? `${change > 0 ? '+' : ''}${change}%` : '정보 없음';
+  const changeClass = change === null ? '' : change > 0 ? 'fx-up' : change < 0 ? 'fx-down' : '';
+  const rangeText =
+    typeof fxContext.low52w === 'number' && typeof fxContext.high52w === 'number'
+      ? ` <span class="fx-range">(52주 ${fxContext.low52w.toLocaleString('ko-KR')}~${fxContext.high52w.toLocaleString('ko-KR')}원)</span>`
+      : '';
+
+  return `
+    <div class="hero-fx">
+      💱 원/달러 환율: <strong>${fxContext.currentPrice.toLocaleString('ko-KR')}원</strong>
+      <span class="${changeClass}">(전일대비 ${escapeHtml(changeText)})</span>${rangeText}
+    </div>`;
 }
 
 function renderBadges(picks) {
@@ -373,6 +397,10 @@ const STYLE_BLOCK = `<style>
   }
   .hero-date { font-size: 14px; opacity: 0.85; margin-bottom: 8px; }
   .hero-headline { font-size: 20px; font-weight: 700; line-height: 1.5; }
+  .hero-fx { font-size: 13px; opacity: 0.9; margin-top: 10px; }
+  .hero-fx .fx-range { opacity: 0.75; }
+  .hero-fx .fx-up { color: #ff8a80; }
+  .hero-fx .fx-down { color: #82b1ff; }
   .section { padding: 24px; border-top: 1px solid #eceef1; }
   .section-title { font-size: 17px; margin: 0 0 14px; }
   .empty-note { color: #5f6368; font-size: 14px; }

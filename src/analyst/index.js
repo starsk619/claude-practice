@@ -41,14 +41,16 @@ function assertValidSummaryResult(summaryResult) {
  *   뉴스에 언급된 종목 + 핵심 관심 종목의 실제 시세/밸류에이션/변동성 (picks 결정 전 판단 근거로 제공)
  * @param {import('../pickHistory/index.js').PickHistoryEntry[]} [pickHistory] - 최근 리포트의
  *   실제 판단 이력 (일관성 유지 + 판단 이후 주가 흐름 참고용)
+ * @param {import('../priceData/fxContext.js').FxContext | null} [fxContext] - 원/달러 환율
+ *   (수출주 실적/외국인 자금 흐름 판단의 거시 배경 지표, 조회 실패 시 null)
  * @returns {Promise<import('../types.js').AnalystResult>}
  */
-export async function analyzeInvestment(summaryResult, marketContext = [], pickHistory = []) {
+export async function analyzeInvestment(summaryResult, marketContext = [], pickHistory = [], fxContext = null) {
   assertValidSummaryResult(summaryResult);
 
   const client = createGeminiClient();
   const systemInstruction = buildSystemPrompt();
-  const userPrompt = buildUserPrompt(summaryResult, marketContext, pickHistory);
+  const userPrompt = buildUserPrompt(summaryResult, marketContext, pickHistory, fxContext);
 
   let response;
   try {

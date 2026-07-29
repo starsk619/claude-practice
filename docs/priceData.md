@@ -36,6 +36,7 @@ API(Yahoo Finance 차트 API, 네이버 금융)로 실제 시세/밸류에이션
 | `src/priceData/watchlist.js` | `CORE_WATCHLIST_SECTORS`/`CORE_WATCHLIST_NAMES`/`SECTOR_BY_NAME`/`CORE_WATCHLIST_OVERRIDES` — 뉴스 언급 여부와 무관하게 매일 훑어보는 "핵심 관심 종목" 목록(섹터별 그룹) + 이름→섹터 조회 맵. |
 | `src/priceData/marketContext.js` | `buildMarketContext(newsItems, options)` — 뉴스 언급 종목 + 핵심 관심 종목을 합쳐 시세/밸류에이션을 미리 조회(판단 "전"). |
 | `src/priceData/portfolioRisk.js` | `findSectorConcentration(picks)` — "매수 고려" 종목이 같은 섹터에 몰려 있는지 점검. |
+| `src/priceData/fxContext.js` | `fetchFxContext()` — 원/달러 환율(현재가/등락률/52주 레인지) 조회, `fetchPriceInfo`를 `'KRW=X'` 티커로 재사용(새 API 불필요). |
 | `src/priceData/index.js` | `enrichPicksWithPriceData(picks, marketContext)` — `picks[]`에 표시용 `priceInfo` 부여(판단 "후"), marketContext 스냅샷 우선 재사용. |
 
 ### 함수 시그니처
@@ -212,5 +213,19 @@ export async function enrichPicksWithPriceData(picks, marketContext = []) { ... 
   위주로만 선정. 반도체장비/전자부품/인터넷금융/엔터테인먼트/IT서비스 등 5개 섹터 신설 +
   바이오제약/에너지유틸리티/지주기타 3개 섹터에 종목 추가(총 22개 섹터).
 - 확장 전 `src/data/krxListedCompanies.json`에 실제로 존재하는 이름인지 전수 검증(0건 누락).
+
+### 2026-07-29 — 원/달러 환율(fxContext) 추가
+- 사용자가 "30년차 전문가라면 환율도 봐야 하지 않냐"고 지적 — 기존 리포트는
+  `shortTermOutlook`/`longTermOutlook` 문장에 "환율 변동성"이 막연한 배경 서술로만 언급되고
+  실제 숫자 근거는 없는 상태였음.
+- `fxContext.js` 신규 작성. Yahoo Finance가 통화쌍도 `'KRW=X'` 티커로 개별 종목과 동일한
+  방식(`fetchPriceInfo`)으로 제공하는 것을 활용 — 새 API 연동 없이 기존 함수를 그대로
+  재사용해서 현재가/전일대비 등락률/52주 레인지를 얻음.
+  `docs/roadmap.md`에 먼저 조사/설계를 기록해두고, 같은 날 바로 구현까지 진행.
+- `src/index.js`에서 `buildMarketContext`와 `Promise.all`로 병렬 조회(서로 독립적인 작업),
+  결과를 `analystResultWithPrices.fxContext`에 포함. 조회 실패 시 `null`로 파이프라인은
+  계속 진행.
+- `analyzeInvestment`/`buildUserPrompt`(`docs/analyst.md`), `generateReport`의 리포트
+  히어로 영역(`docs/notifier.md`)에도 함께 반영 — 자세한 내용은 각 문서 참고.
 
 > 앞으로 이 모듈을 수정할 때마다 위 형식(날짜 + 변경 내용)으로 이 섹션에 계속 추가할 것.
