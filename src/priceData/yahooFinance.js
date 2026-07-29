@@ -82,9 +82,13 @@ export async function fetchPriceInfo(code, suffix) {
     const adjCloses = result?.indicators?.adjclose?.[0]?.adjclose ?? closes;
 
     // 52주 고/저는 실제 거래가(raw close) 기준으로 직접 계산한다(meta 필드는 신뢰 불가).
+    // Yahoo가 내려주는 raw close에 부동소수점 잔여값이 섞여 있는 경우가 있어(예: 236,666.672원),
+    // 원화는 소수 단위가 없으므로 정수로 반올림해서 표시 오류를 없앤다.
+    const currency = meta.currency ?? 'KRW';
+    const roundToCurrencyUnit = (n) => (currency === 'KRW' ? Math.round(n) : Math.round(n * 100) / 100);
     const validCloses = (closes ?? []).filter((c) => typeof c === 'number' && c > 0);
-    const high52w = validCloses.length ? Math.max(...validCloses) : null;
-    const low52w = validCloses.length ? Math.min(...validCloses) : null;
+    const high52w = validCloses.length ? roundToCurrencyUnit(Math.max(...validCloses)) : null;
+    const low52w = validCloses.length ? roundToCurrencyUnit(Math.min(...validCloses)) : null;
 
     // meta.chartPreviousClose는 "전일 종가"가 아니라 "조회 range 시작 직전 종가"라
     // range를 바꾸면 비교 기준 시점이 통째로 바뀌어버린다(range=1y일 땐 1년 전과 비교하는
@@ -119,7 +123,7 @@ export async function fetchPriceInfo(code, suffix) {
       changePercent: changePercent !== null ? Math.round(changePercent * 100) / 100 : null,
       high52w,
       low52w,
-      currency: meta.currency ?? 'KRW',
+      currency,
       annualizedVolatilityPercent: computeAnnualizedVolatilityPercent(recentAdjCloses),
     };
   } catch (error) {

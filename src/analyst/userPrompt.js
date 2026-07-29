@@ -22,7 +22,10 @@ const BACKGROUND_ONLY_CATEGORIES = new Set([
 function formatMarketContextEntry(entry, index) {
   const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('ko-KR') : '정보 없음');
   const change = typeof entry.changePercent === 'number' ? `${entry.changePercent > 0 ? '+' : ''}${entry.changePercent}%` : '정보 없음';
-  const vol = typeof entry.annualizedVolatilityPercent === 'number' ? `${entry.annualizedVolatilityPercent}%` : '정보 없음';
+  const vol =
+    typeof entry.annualizedVolatilityPercent === 'number'
+      ? `${entry.annualizedVolatilityPercent}%(일 변동성 약 ±${(entry.annualizedVolatilityPercent / Math.sqrt(252)).toFixed(1)}%)`
+      : '정보 없음';
   const per = typeof entry.per === 'number' ? `${entry.per}배` : '정보 없음';
   const forwardPer = typeof entry.forwardPer === 'number' ? `${entry.forwardPer}배` : '정보 없음';
   const pbr = typeof entry.pbr === 'number' ? `${entry.pbr}배` : '정보 없음';
