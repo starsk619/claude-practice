@@ -224,4 +224,17 @@ export function scheduleDailyRun(runFn, options) { ... }
 - 마스크(모의) 데이터로 fxContext가 있을 때 `<div class="hero-fx">`가 실제 값과 함께
   렌더링되고, `null`일 때는 해당 div 자체가 아예 생략되는지 확인.
 
+### 2026-07-29 — 리스크 참고 섹션에 "판단 유형별 누적 성과" 추가
+- 사용자가 요청한 자기 보정 피드백 루프(자세한 배경은 `docs/pickHistory.md`,
+  `docs/analyst.md` 참고)의 표시 부분. `renderRiskNotes`에 `renderRatingPerformance`를
+  추가해, 기존 섹터 집중도/트랙레코드와 함께 "판단 유형별 누적 성과 (자기 보정 참고용)"를
+  같은 "리스크 참고" 섹션 안에 표시.
+- 등급별로 표본이 확보된 것만(`ratingPerformance[rating] !== null`) 목록에 표시하고, 전부
+  표본 부족이면 이 소섹션 자체를 생략. `renderRiskNotes`의 "데이터 없으면 섹션 전체 생략"
+  가드도 세 소섹션(집중도/트랙레코드/누적성과) 기준으로 확장.
+- `.risk-note.rating-performance-note` CSS 클래스 추가(연두색 계열 배경으로 다른 두 소섹션과
+  구분).
+- 모의(mock) 데이터로 표본 있는 등급만 렌더링되고, 전부 표본 부족이면 div 자체가 생략되는지
+  확인.
+
 <!-- 이 모듈을 수정할 때마다 아래에 "### YYYY-MM-DD — 변경 요약" 형식으로 새 항목을 추가할 것 -->

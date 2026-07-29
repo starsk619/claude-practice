@@ -55,6 +55,20 @@ function formatFxContext(fx) {
 }
 
 /**
+ * @param {Object<string, import('../pickHistory/trackRecord.js').RatingPerformanceStat|null>} ratingPerformance
+ */
+function formatRatingPerformance(ratingPerformance) {
+  const ratings = ['매수 고려', '주의'];
+  const lines = ratings.map((rating) => {
+    const stat = ratingPerformance?.[rating];
+    if (!stat) return `- ${rating}: 데이터 부족(아직 참고하지 마세요)`;
+    const sign = stat.avgReturnPercent > 0 ? '+' : '';
+    return `- ${rating}: 적중률 ${stat.hitRatePercent}%(${stat.count}건 중 ${stat.hits}건), 평균 수익률 ${sign}${stat.avgReturnPercent}%`;
+  });
+  return lines.join('\n');
+}
+
+/**
  * @param {import('../pickHistory/index.js').PickHistoryEntry} entry
  */
 function formatPickHistoryEntry(entry) {
@@ -95,9 +109,17 @@ function formatSourceItem(item, index) {
  *   실제로 어떤 종목을 어떻게 판단했는지 이력 (없으면 빈 배열 - 첫 실행 등)
  * @param {import('../priceData/fxContext.js').FxContext | null} [fxContext] - 원/달러 환율
  *   (조회 실패 시 null)
+ * @param {Object<string, import('../pickHistory/trackRecord.js').RatingPerformanceStat|null>} [ratingPerformance] -
+ *   판단 유형별 누적 성과(자기 보정 참고용, 표본 부족한 등급은 없음/null)
  * @returns {string}
  */
-export function buildUserPrompt(summaryResult, marketContext = [], pickHistory = [], fxContext = null) {
+export function buildUserPrompt(
+  summaryResult,
+  marketContext = [],
+  pickHistory = [],
+  fxContext = null,
+  ratingPerformance = {}
+) {
   const now = new Date().toISOString();
   const categories = summaryResult.categories || {};
   const sourceItems = Array.isArray(summaryResult.sourceItems) ? summaryResult.sourceItems : [];
@@ -129,6 +151,8 @@ export function buildUserPrompt(summaryResult, marketContext = [], pickHistory =
     ? pickHistory.map(formatPickHistoryEntry).join('\n\n')
     : '(최근 리포트 이력이 없습니다 — 이번이 사실상 첫 판단입니다.)';
 
+  const ratingPerformanceBlock = formatRatingPerformance(ratingPerformance);
+
   return `현재 시각(기준일): ${now}
 이 시각을 기준으로 "단기(1일~1개월)"와 "장기(6개월~1년 이상)"를 계산하세요.
 
@@ -156,6 +180,15 @@ ${marketContextBlock}
 움직였는지도 근거에 자연스럽게 반영하세요(예: 이전에 매수 고려였는데 이후 더 하락했다면
 밸류에이션 매력이 커진 것인지 추세적 약세인지 최신 데이터로 재평가).
 ${pickHistoryBlock}
+
+## 최근 판단 유형별 누적 성과 (자기 보정 참고용)
+아래는 과거 판단들을 실제 주가와 대사한 결과입니다("데이터 부족"이면 아직 표본이 너무 적어
+신뢰할 수 없다는 뜻이니 무시하고 평소대로 판단하세요). 표본이 있는 등급은 참고해서 판단
+기준을 스스로 보정하세요 — 적중률이 낮게 나온 등급은 그 등급을 주는 기준을 더 엄격하게
+잡고 확신도를 보수적으로, 잘 맞고 있는 등급은 기존 기준을 유지하세요. 다만 이건 어디까지나
+보조 참고 자료이며, 오늘 실제 뉴스/시세 근거(원칙 1)를 무시하고 과거 성과만으로 등급을
+억지로 바꾸지는 마세요.
+${ratingPerformanceBlock}
 
 ## 근거로 사용할 원본 뉴스 목록 (${trimmedItems.length}건)
 ${sourceList}${omittedNote}

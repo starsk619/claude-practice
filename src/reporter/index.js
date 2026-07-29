@@ -165,22 +165,25 @@ function renderBadges(picks) {
 }
 
 /**
- * 종목 하나하나의 손절선과는 별개로, 포트폴리오 전체 관점의 참고 사항 두 가지를 보여준다:
+ * 종목 하나하나의 손절선과는 별개로, 포트폴리오 전체 관점의 참고 사항 세 가지를 보여준다:
  * 1) 오늘 "매수 고려" 종목이 특정 섹터에 몰려 있는지(집중 리스크)
  * 2) 지난 1주일/1개월 전 판단이 실제로 맞았는지(트랙레코드)
- * 둘 다 데이터가 없으면(첫 실행 등) 섹션 자체를 생략한다.
+ * 3) 판단 유형(등급)별 누적 성과(표본이 쌓일수록 채워짐, 자기 보정 참고용)
+ * 셋 다 데이터가 없으면(첫 실행 등) 섹션 자체를 생략한다.
  * @param {import('../types.js').AnalystResult} analystResult
  */
 function renderRiskNotes(analystResult) {
   const concentrationHtml = renderSectorConcentration(analystResult?.sectorConcentration);
   const trackRecordHtml = renderTrackRecord(analystResult?.trackRecord);
-  if (!concentrationHtml && !trackRecordHtml) return '';
+  const ratingPerformanceHtml = renderRatingPerformance(analystResult?.ratingPerformance);
+  if (!concentrationHtml && !trackRecordHtml && !ratingPerformanceHtml) return '';
 
   return `
   <section class="section">
     <h2 class="section-title">리스크 참고</h2>
     ${concentrationHtml}
     ${trackRecordHtml}
+    ${ratingPerformanceHtml}
   </section>`;
 }
 
@@ -220,6 +223,31 @@ function renderTrackRecord(trackRecord) {
 function renderTrackRecordRow(stat) {
   const sign = stat.avgReturnPercent > 0 ? '+' : '';
   return `<li>${escapeHtml(stat.label)} 전 판단(${stat.count}건) 적중률 ${stat.hitRatePercent}% (${stat.hits}/${stat.count}), 평균 수익률 ${sign}${stat.avgReturnPercent}%</li>`;
+}
+
+/**
+ * 판단 유형(등급)별 누적 성과. 표본이 부족한 등급(null)은 표시하지 않고, 전부 표본 부족이면
+ * 섹션 자체를 생략한다(초기 며칠간 빈 박스만 뜨는 것을 방지).
+ * @param {Object<string, { count: number, hits: number, hitRatePercent: number, avgReturnPercent: number }|null>} [ratingPerformance]
+ */
+function renderRatingPerformance(ratingPerformance) {
+  if (!ratingPerformance || typeof ratingPerformance !== 'object') return '';
+
+  const rows = Object.entries(ratingPerformance)
+    .filter(([, stat]) => stat !== null && stat !== undefined)
+    .map(([rating, stat]) => renderRatingPerformanceRow(rating, stat));
+  if (!rows.length) return '';
+
+  return `
+    <div class="risk-note rating-performance-note">
+      <strong>판단 유형별 누적 성과 (자기 보정 참고용)</strong>
+      <ul>${rows.join('')}</ul>
+    </div>`;
+}
+
+function renderRatingPerformanceRow(rating, stat) {
+  const sign = stat.avgReturnPercent > 0 ? '+' : '';
+  return `<li>${escapeHtml(rating)}(${stat.count}건) 적중률 ${stat.hitRatePercent}% (${stat.hits}/${stat.count}), 평균 수익률 ${sign}${stat.avgReturnPercent}%</li>`;
 }
 
 function renderOutlookTables(analystResult) {
@@ -419,6 +447,7 @@ const STYLE_BLOCK = `<style>
   .risk-note:last-child { margin-bottom: 0; }
   .risk-note.concentration-note { background: #fff3e0; border: 1px solid #ffcc80; color: #6b4a00; }
   .risk-note.track-record-note { background: #eef2f7; border: 1px solid #c8d6e5; color: #2b3a4a; }
+  .risk-note.rating-performance-note { background: #eef7f0; border: 1px solid #b7ddc3; color: #1f4a2c; }
   .risk-note ul { margin: 6px 0 0; padding-left: 18px; }
   .risk-note li { margin-bottom: 2px; }
 

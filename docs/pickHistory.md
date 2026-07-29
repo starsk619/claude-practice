@@ -112,4 +112,33 @@ export async function computeTrackRecord(history, marketContext = []) { ... }
 - `src/reporter/index.js`에 `renderTrackRecord`를 추가해 "지난 판단 성과" 형태로 리포트에 표시
   (자세한 내용은 `docs/notifier.md` 변경 이력 참고).
 
+### 2026-07-29 — 판단 유형별 누적 성과 집계 (자기 보정 피드백 루프)
+- 사용자가 "환율까지 추가했는데 점수가 왜 거의 안 오르냐"고 물어서, "지금 설계로는 몇 주가
+  지나도 종목 선정 자체가 자동으로 더 정확해지지 않는다 — Gemini는 매일 독립 호출되는
+  stateless 모델이라 훈련/학습 루프가 없고, `trackRecord`는 '맞았는지 보여주는' 용도일 뿐
+  '다음 판단을 바꾸는' 루프가 없다"고 정직하게 설명한 뒤, 사용자가 "그럼 피드백 루프를
+  추가해달라"고 요청해서 구현.
+- **중요한 전제**: 이건 모델 재훈련/파인튜닝이 아니다. Gemini API 특성상 진짜 학습 루프는
+  불가능하고, 가능한 건 "과거 판단 유형별 실제 성과를 프롬프트에 자기 성찰 자료로 제공하고
+  그에 맞춰 확신도/등급 기준을 스스로 보정하도록 명시적으로 지시하는" 프롬프트 레벨의
+  자기 보정(self-calibration)뿐이다. 데이터를 프롬프트에 넣는다고 모델이 자동으로 반영한다는
+  보장도 없다(일 변동성 인용 지시를 따로 추가해야 했던 사례와 동일한 한계, `docs/analyst.md`
+  참고) — 코드가 rating/confidence를 강제로 덮어쓰는 로직은 의도적으로 넣지 않았다.
+- `computeRatingPerformance(history, marketContext)` 신규 작성(`trackRecord.js`에 추가).
+  `computeTrackRecord`가 "가장 가까운 판단 1건"만 보는 것과 달리, 표본을 늘리기 위해
+  `MIN_AGE_DAYS`(3일) 이상 지난 판단을 전부(여러 날짜에 걸쳐) `SCORABLE_RATINGS`(매수 고려/
+  주의)별로 모아 집계한다. 등급별 표본이 `MIN_SAMPLE_SIZE`(10건) 미만이면 그 등급은 `null`
+  반환(표본 부족으로 아직 근거로 쓰지 말라는 의미) — 초기 며칠간 표본 2~3건으로 억지 결론을
+  내리는 걸 방지.
+- 알려진 한계: 판단 시점부터 경과일이 제각각인 판단들을 섞어서 집계하므로 "정확히 N일 후
+  수익률"이 아니라 "방향성이 맞았는지"에 가까운 느슨한 지표다. 등급별 성향을 보는 용도로는
+  충분하다고 판단.
+- `src/index.js`의 파이프라인 순서 변경: 기존에는 `analyzeInvestment`/`computeTrackRecord`를
+  `Promise.all`로 병렬 실행했는데, `computeRatingPerformance` 결과는 프롬프트에 직접 들어가야
+  해서 `analyzeInvestment` 호출 **전에** 먼저 `await`하도록 변경(marketContext/fxContext
+  확보 이후 지점). `computeTrackRecord`는 여전히 표시 전용이라 병렬 유지.
+- 프롬프트/시스템 지침 반영은 `docs/analyst.md`, 리포트 표시는 `docs/notifier.md` 참고.
+- 모의(mock) 데이터로 검증: 표본 10건 이상인 등급(적중 10/12, 83%)은 정확히 계산되고,
+  10건 미만인 등급은 `null`, 3일 이내 최신 항목은 집계에서 제외되는지 확인.
+
 > 앞으로 이 모듈을 수정할 때마다 위 형식(날짜 + 변경 내용)으로 이 섹션에 계속 추가할 것.

@@ -16,6 +16,10 @@ const HORIZONS = [
 
 const SCORABLE_RATINGS = new Set(['매수 고려', '주의']);
 
+// computeRatingPerformance(자기 보정용 집계)에서 쓰는 기준.
+const MIN_AGE_DAYS = 3; // 최소 이 정도는 지나야 "결과가 어느 정도 드러났다"고 보고 집계 대상에 포함
+const MIN_SAMPLE_SIZE = 10; // 등급별 표본이 이보다 적으면 아직 근거로 쓰기엔 부족하다고 보고 null 반환
+
 function daysBetween(a, b) {
   return Math.abs(a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24);
 }
@@ -115,6 +119,65 @@ export async function computeTrackRecord(history, marketContext = []) {
       hitRatePercent: Math.round((hits / details.length) * 100),
       avgReturnPercent,
       details,
+    };
+  }
+
+  return result;
+}
+
+/**
+ * @typedef {Object} RatingPerformanceStat
+ * @property {number} count
+ * @property {number} hits
+ * @property {number} hitRatePercent
+ * @property {number} avgReturnPercent
+ */
+
+/**
+ * 판단 유형(rating)별 누적 성과를 집계한다. computeTrackRecord가 "가장 가까운 판단 1건"만
+ * 보는 것과 달리, 표본을 늘리기 위해 MIN_AGE_DAYS 이상 지난 판단을 전부(여러 날짜에 걸쳐)
+ * 스코어링해서 등급별로 묶는다. 판단 시점부터 경과일이 제각각이라 "정확히 N일 후 수익률"은
+ * 아니지만, "이 등급이 실제로 방향을 맞히는 경향이 있는지"를 보는 용도로는 충분하다.
+ *
+ * 이 결과는 analyst 프롬프트에 "자기 보정" 참고 자료로 제공된다(src/analyst/userPrompt.js).
+ * 다만 모델이 이걸 실제로 판단에 반영한다는 보장은 없다 — 프롬프트에 데이터를 준다고 모델이
+ * 자동으로 그걸 반영하는 게 아니라는 건 이 프로젝트에서 이미 한 번 겪은 문제라(일 변동성 인용
+ * 지시 추가 사례, docs/analyst.md 참고), systemPrompt.js에 명시적 지시를 함께 추가해야 한다.
+ *
+ * @param {import('./index.js').PickHistoryEntry[]} [history]
+ * @param {import('../priceData/marketContext.js').MarketContextEntry[]} [marketContext]
+ * @returns {Promise<Object<string, RatingPerformanceStat|null>>} rating -> 통계(표본 부족하면 null)
+ */
+export async function computeRatingPerformance(history, marketContext = []) {
+  const list = Array.isArray(history) ? history : [];
+  const now = new Date();
+  const contextByCode = new Map(marketContext.map((entry) => [entry.code, entry]));
+
+  const eligibleEntries = list.filter((entry) => {
+    const entryDate = new Date(entry?.generatedAt);
+    return !Number.isNaN(entryDate.getTime()) && daysBetween(now, entryDate) >= MIN_AGE_DAYS;
+  });
+
+  const allScored = (
+    await Promise.all(
+      eligibleEntries.flatMap((entry) => (entry.picks ?? []).map((pick) => scorePick(pick, contextByCode)))
+    )
+  ).filter((d) => d !== null);
+
+  const result = {};
+  for (const rating of SCORABLE_RATINGS) {
+    const subset = allScored.filter((d) => d.rating === rating);
+    if (subset.length < MIN_SAMPLE_SIZE) {
+      result[rating] = null;
+      continue;
+    }
+
+    const hits = subset.filter((d) => d.hit).length;
+    result[rating] = {
+      count: subset.length,
+      hits,
+      hitRatePercent: Math.round((hits / subset.length) * 100),
+      avgReturnPercent: Math.round((subset.reduce((sum, d) => sum + d.returnPercent, 0) / subset.length) * 100) / 100,
     };
   }
 

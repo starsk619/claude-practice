@@ -43,14 +43,22 @@ function assertValidSummaryResult(summaryResult) {
  *   실제 판단 이력 (일관성 유지 + 판단 이후 주가 흐름 참고용)
  * @param {import('../priceData/fxContext.js').FxContext | null} [fxContext] - 원/달러 환율
  *   (수출주 실적/외국인 자금 흐름 판단의 거시 배경 지표, 조회 실패 시 null)
+ * @param {Object<string, import('../pickHistory/trackRecord.js').RatingPerformanceStat|null>} [ratingPerformance] -
+ *   판단 유형(rating)별 누적 성과(자기 보정 참고용, 표본 부족한 등급은 null)
  * @returns {Promise<import('../types.js').AnalystResult>}
  */
-export async function analyzeInvestment(summaryResult, marketContext = [], pickHistory = [], fxContext = null) {
+export async function analyzeInvestment(
+  summaryResult,
+  marketContext = [],
+  pickHistory = [],
+  fxContext = null,
+  ratingPerformance = {}
+) {
   assertValidSummaryResult(summaryResult);
 
   const client = createGeminiClient();
   const systemInstruction = buildSystemPrompt();
-  const userPrompt = buildUserPrompt(summaryResult, marketContext, pickHistory, fxContext);
+  const userPrompt = buildUserPrompt(summaryResult, marketContext, pickHistory, fxContext, ratingPerformance);
 
   let response;
   try {

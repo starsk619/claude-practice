@@ -55,6 +55,8 @@
  * @property {string} disclaimer - 투자 자문이 아니라는 면책 문구
  * @property {import('./priceData/fxContext.js').FxContext | null} [fxContext] - 원/달러 환율
  *   (조회 실패 시 null)
+ * @property {Object<string, import('./pickHistory/trackRecord.js').RatingPerformanceStat|null>} [ratingPerformance] -
+ *   판단 유형(rating)별 누적 성과(자기 보정 참고용, 표본 부족한 등급은 null)
  */
 
 export {};
