@@ -62,8 +62,10 @@ export async function runDailyPipeline() {
   console.log(`[news-bot] 3/4 투자 분석 완료: 종목 ${analystResult.picks?.length ?? 0}건`);
 
   // 뉴스 텍스트만으로는 "이미 주가에 반영됐는지" 알 수 없어서, 실제 시세(무료 Yahoo Finance)를
-  // 붙여 보완한다. 종목명이 KRX 목록에 없거나 시세 조회가 실패해도 파이프라인은 계속 진행된다.
-  const enrichedPicks = await enrichPicksWithPriceData(analystResult.picks);
+  // 붙여 보완한다. marketContext에 이미 조회해둔 스냅샷이 있으면 재사용하고(분석 전/후 두 번
+  // 조회하면 그 사이 가격이 바뀌어 카드 안 시세가 어긋나는 문제가 있었음), 없는 종목만 새로
+  // 조회한다. 종목명이 KRX 목록에 없거나 시세 조회가 실패해도 파이프라인은 계속 진행된다.
+  const enrichedPicks = await enrichPicksWithPriceData(analystResult.picks, marketContext);
   const analystResultWithPrices = { ...analystResult, picks: enrichedPicks };
 
   // 이번 판단 결과를 이력에 추가해서 저장해두면, 다음 실행(내일 08:00) 때 다시 읽어와

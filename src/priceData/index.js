@@ -13,10 +13,15 @@ import { fetchPriceInfo } from './yahooFinance.js';
 
 /**
  * @param {import('../types.js').StockPick[]} [picks]
+ * @param {import('./marketContext.js').MarketContextEntry[]} [marketContext] - analyst 호출
+ *   "전"에 이미 조회해둔 시세 스냅샷. 여기 있는 종목은 다시 fetch하지 않고 그대로 재사용한다
+ *   (분석 전/후 두 번 조회하면 그 사이 실시간 가격이 바뀌어 리포트 한 카드 안에 "현재가"가
+ *   두 개로 다르게 찍히는 문제가 있었음).
  * @returns {Promise<import('../types.js').StockPick[]>} priceInfo가 채워진 picks (원본은 변경하지 않음)
  */
-export async function enrichPicksWithPriceData(picks) {
+export async function enrichPicksWithPriceData(picks, marketContext = []) {
   const list = Array.isArray(picks) ? picks : [];
+  const contextByCode = new Map(marketContext.map((entry) => [entry.code, entry]));
 
   return Promise.all(
     list.map(async (pick) => {
@@ -24,6 +29,16 @@ export async function enrichPicksWithPriceData(picks) {
       if (!ticker) {
         return { ...pick, priceInfo: null };
       }
+
+      const cached = contextByCode.get(ticker.code);
+      if (cached) {
+        const { currentPrice, changePercent, high52w, low52w, currency, annualizedVolatilityPercent } = cached;
+        return {
+          ...pick,
+          priceInfo: { currentPrice, changePercent, high52w, low52w, currency, annualizedVolatilityPercent },
+        };
+      }
+
       const priceInfo = await fetchPriceInfo(ticker.code, ticker.suffix);
       return { ...pick, priceInfo };
     })
