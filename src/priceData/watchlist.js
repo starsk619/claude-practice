@@ -16,9 +16,12 @@
  */
 export const CORE_WATCHLIST_SECTORS = [
   { sector: '반도체', names: ['삼성전자', 'SK하이닉스'] },
+  { sector: '반도체장비', names: ['한미반도체'] },
+  { sector: '전자부품', names: ['삼성전기', 'LG이노텍'] },
   { sector: '플랫폼', names: ['NAVER', '카카오'] },
+  { sector: '인터넷금융', names: ['카카오뱅크', '카카오페이'] },
   { sector: '2차전지', names: ['LG에너지솔루션', '포스코퓨처엠'] },
-  { sector: '바이오/제약', names: ['삼성바이오로직스', '셀트리온', '한미약품'] },
+  { sector: '바이오/제약', names: ['삼성바이오로직스', '셀트리온', '한미약품', 'SK바이오사이언스'] },
   { sector: '자동차', names: ['현대자동차', '기아'] },
   { sector: '철강/소재', names: ['POSCO홀딩스'] },
   {
@@ -29,12 +32,17 @@ export const CORE_WATCHLIST_SECTORS = [
   { sector: '전지/소재', names: ['삼성SDI'] },
   { sector: '통신', names: ['SK텔레콤', 'LG유플러스'] },
   { sector: '게임', names: ['크래프톤', '넷마블'] },
+  { sector: '엔터테인먼트', names: ['하이브', '에스엠'] },
+  { sector: 'IT서비스', names: ['삼성에스디에스'] },
   { sector: '조선/방산', names: ['한화에어로스페이스', 'HD현대중공업', '한국항공우주'] },
   { sector: '건설', names: ['현대건설', 'GS건설'] },
   { sector: '항공/해운', names: ['대한항공', '아시아나항공', 'HMM'] },
-  { sector: '에너지/유틸리티', names: ['SK이노베이션', '한국가스공사', '한국전력공사', '두산에너빌리티'] },
+  {
+    sector: '에너지/유틸리티',
+    names: ['SK이노베이션', '한국가스공사', '한국전력공사', '두산에너빌리티', 'S-Oil'],
+  },
   { sector: '소비재/유통', names: ['CJ제일제당', '오리온', '아모레퍼시픽', 'LG생활건강', '롯데쇼핑', '이마트'] },
-  { sector: '지주/기타', names: ['SK스퀘어'] },
+  { sector: '지주/기타', names: ['SK스퀘어', '삼성물산'] },
 ];
 
 export const CORE_WATCHLIST_NAMES = CORE_WATCHLIST_SECTORS.flatMap((group) => group.names);
