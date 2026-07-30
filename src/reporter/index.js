@@ -126,8 +126,10 @@ function renderFxContext(fxContext) {
 
   return `
     <div class="hero-fx">
-      💱 원/달러 환율: <strong>${fxContext.currentPrice.toLocaleString('ko-KR')}원</strong>
-      <span class="${changeClass}">(전일대비 ${escapeHtml(changeText)})</span>${rangeText}
+      <span class="hero-fx-chip">
+        💱 원/달러 환율: <strong>${fxContext.currentPrice.toLocaleString('ko-KR')}원</strong>
+        <span class="${changeClass}">(전일대비 ${escapeHtml(changeText)})</span>${rangeText}
+      </span>
     </div>`;
 }
 
@@ -425,10 +427,22 @@ const STYLE_BLOCK = `<style>
   }
   .hero-date { font-size: 14px; opacity: 0.85; margin-bottom: 8px; }
   .hero-headline { font-size: 20px; font-weight: 700; line-height: 1.5; }
-  .hero-fx { font-size: 13px; opacity: 0.9; margin-top: 10px; }
-  .hero-fx .fx-range { opacity: 0.75; }
-  .hero-fx .fx-up { color: #ff8a80; }
-  .hero-fx .fx-down { color: #82b1ff; }
+  .hero-fx { margin-top: 12px; }
+  .hero-fx-chip {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 7px 14px;
+    background: rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 10px;
+  }
+  .hero-fx .fx-range { opacity: 0.8; font-weight: 400; }
+  .hero-fx .fx-up { color: #ffcdb2; font-weight: 700; }
+  .hero-fx .fx-down { color: #bbe3ff; font-weight: 700; }
   .section { padding: 24px; border-top: 1px solid #eceef1; }
   .section-title { font-size: 17px; margin: 0 0 14px; }
   .empty-note { color: #5f6368; font-size: 14px; }
