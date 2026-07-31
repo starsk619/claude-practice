@@ -9,7 +9,7 @@
  *   API 호출 한 번으로 가격 정보 + 52주 고저 + 변동성 계산 재료를 동시에 얻는다.
  * - meta.fiftyTwoWeekHigh/Low, meta.chartPreviousClose는 비인증 요청에서 신뢰할 수 없는
  *   경우가 있어(0으로 오거나 액면분할/유상증자 보정이 안 됨) 쓰지 않고, 직접 받아온 종가
- *   배열에서 계산한다. 등락률/변동성은 액면분할·배당을 보정한 adjclose를 우선 사용하고,
+ *   배열에서 계산한다. 52주 고저/변동성은 액면분할·배당을 보정한 adjclose를 우선 사용하고,
  *   코스피/코스닥 상하한가(±30%)를 넘는 값은 기업행위/데이터 오류로 보고 이상치로 제외한다.
  */
 
@@ -80,15 +80,21 @@ export async function fetchPriceInfo(code, suffix) {
     const currentPrice = meta.regularMarketPrice;
     const closes = result?.indicators?.quote?.[0]?.close;
     const adjCloses = result?.indicators?.adjclose?.[0]?.adjclose ?? closes;
+    const validCloses = (closes ?? []).filter((c) => typeof c === 'number' && c > 0);
+    const validAdjCloses = (adjCloses ?? []).filter((c) => typeof c === 'number' && c > 0);
 
-    // 52주 고/저는 실제 거래가(raw close) 기준으로 직접 계산한다(meta 필드는 신뢰 불가).
-    // Yahoo가 내려주는 raw close에 부동소수점 잔여값이 섞여 있는 경우가 있어(예: 236,666.672원),
+    // 52주 고/저는 raw close가 아니라 adjclose(분할/배당 보정 종가) 기준으로 계산한다.
+    // raw close로 계산했더니, 조회 시점(1년) 안에 액면분할이 있었던 종목(예: SK하이닉스)에서
+    // 분할 전/후 가격이 그대로 섞여 "52주 245,000~2,919,000원(약 12배 폭)"처럼 실제로는
+    // 불가능한 범위가 나오는 문제가 실전 리포트에서 발견됐다(등락률/변동성엔 이미 adjclose를
+    // 쓰고 있어서 문제없었는데 52주 고저만 이 사각지대에 남아있었음). adjclose는 오늘자에
+    // 가까울수록 raw close와 거의 같아 표시 오차는 무시할 수준이다.
+    // Yahoo가 내려주는 종가에 부동소수점 잔여값이 섞여 있는 경우가 있어(예: 236,666.672원),
     // 원화는 소수 단위가 없으므로 정수로 반올림해서 표시 오류를 없앤다.
     const currency = meta.currency ?? 'KRW';
     const roundToCurrencyUnit = (n) => (currency === 'KRW' ? Math.round(n) : Math.round(n * 100) / 100);
-    const validCloses = (closes ?? []).filter((c) => typeof c === 'number' && c > 0);
-    const high52w = validCloses.length ? roundToCurrencyUnit(Math.max(...validCloses)) : null;
-    const low52w = validCloses.length ? roundToCurrencyUnit(Math.min(...validCloses)) : null;
+    const high52w = validAdjCloses.length ? roundToCurrencyUnit(Math.max(...validAdjCloses)) : null;
+    const low52w = validAdjCloses.length ? roundToCurrencyUnit(Math.min(...validAdjCloses)) : null;
 
     // meta.chartPreviousClose는 "전일 종가"가 아니라 "조회 range 시작 직전 종가"라
     // range를 바꾸면 비교 기준 시점이 통째로 바뀌어버린다(range=1y일 땐 1년 전과 비교하는
@@ -115,7 +121,6 @@ export async function fetchPriceInfo(code, suffix) {
     }
 
     // 변동성은 분할/배당 보정된 adjclose로 계산해 기업행위로 인한 인위적 급등락을 배제한다.
-    const validAdjCloses = (adjCloses ?? []).filter((c) => typeof c === 'number' && c > 0);
     const recentAdjCloses = validAdjCloses.slice(-VOLATILITY_WINDOW_DAYS);
 
     return {
