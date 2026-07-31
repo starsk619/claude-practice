@@ -247,4 +247,18 @@ export async function enrichPicksWithPriceData(picks, marketContext = []) { ... 
   2,000,000으로 나올 상황이 수정 후 200,000으로 정상화됨을 확인(고저 비율 2배 미만).
   기존 `fetchFxContext`/`computeRatingPerformance` 관련 회귀 테스트도 재실행해 영향 없음을 확인.
 
+### 2026-07-31 — 일별 등락률도 adjclose 기준으로 변경
+- 52주 고/저가 fix와 같은 원인의 남은 사각지대: 일별 등락률(`changePercent`)의 "전일 종가"
+  판정(`lastCloseIsToday`)과 `previousClose`가 여전히 raw close를 쓰고 있어서, 액면분할
+  당일에는 분할 전/후 가격이 그대로 비교돼 거의 항상 KRX ±30% 상하한가에 걸려 "정보 없음"으로
+  빠지는 문제가 있었음(틀린 값이 아니라 값이 안 보이는 형태로 나타나 지금까지는 눈에 덜 띄었음).
+- `lastCloseIsToday` 판정과 `previousClose` 도출을 raw `close` 대신 `adjclose` 기준으로
+  변경(52주 고/저와 동일한 근거) — 분할 당일에도 정확한 등락률이 나오고, 평소엔 adjclose가
+  raw close와 거의 같아 표시값 차이가 없음. 더 이상 쓰이지 않게 된 `validCloses`(raw close
+  전용 배열)는 제거.
+- 모의(mock) 분할 시나리오(전일 raw 2,000,000/adj 200,000, 오늘 현재가 205,000)로 검증:
+  수정 전이라면 이상치로 null 처리됐을 상황에서 수정 후 정확히 +2.5%가 나오는 것을 확인.
+  평소(비분할) 케이스도 기존과 동일하게 동작하는지 함께 확인, 기존 환율/52주고저/피드백루프
+  회귀 테스트도 전부 재실행해 영향 없음을 확인.
+
 > 앞으로 이 모듈을 수정할 때마다 위 형식(날짜 + 변경 내용)으로 이 섹션에 계속 추가할 것.

@@ -9,8 +9,9 @@
  *   API 호출 한 번으로 가격 정보 + 52주 고저 + 변동성 계산 재료를 동시에 얻는다.
  * - meta.fiftyTwoWeekHigh/Low, meta.chartPreviousClose는 비인증 요청에서 신뢰할 수 없는
  *   경우가 있어(0으로 오거나 액면분할/유상증자 보정이 안 됨) 쓰지 않고, 직접 받아온 종가
- *   배열에서 계산한다. 52주 고저/변동성은 액면분할·배당을 보정한 adjclose를 우선 사용하고,
- *   코스피/코스닥 상하한가(±30%)를 넘는 값은 기업행위/데이터 오류로 보고 이상치로 제외한다.
+ *   배열에서 계산한다. 등락률/52주 고저/변동성 전부 액면분할·배당을 보정한 adjclose를
+ *   기준으로 계산하고, 코스피/코스닥 상하한가(±30%)를 넘는 값은 기업행위/데이터 오류로
+ *   보고 이상치로 제외한다.
  */
 
 const CHART_API_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart/';
@@ -80,7 +81,6 @@ export async function fetchPriceInfo(code, suffix) {
     const currentPrice = meta.regularMarketPrice;
     const closes = result?.indicators?.quote?.[0]?.close;
     const adjCloses = result?.indicators?.adjclose?.[0]?.adjclose ?? closes;
-    const validCloses = (closes ?? []).filter((c) => typeof c === 'number' && c > 0);
     const validAdjCloses = (adjCloses ?? []).filter((c) => typeof c === 'number' && c > 0);
 
     // 52주 고/저는 raw close가 아니라 adjclose(분할/배당 보정 종가) 기준으로 계산한다.
@@ -101,14 +101,19 @@ export async function fetchPriceInfo(code, suffix) {
     // 셈이 되어 거의 모든 종목이 이상치로 잡히는 문제가 있었음). 그래서 range와 무관하게
     // 항상 "어제 종가"를 가리키도록, 직접 받아온 일별 종가 배열의 마지막 두 값을 쓴다.
     // (currentPrice가 이미 마지막 종가와 거의 같다면 그 값은 "오늘자"이므로 한 칸 더 앞을 쓴다.)
-    const lastClose = validCloses[validCloses.length - 1];
+    // raw close가 아니라 adjclose를 쓰는 이유: raw close로 계산하면 액면분할 당일엔 분할
+    // 전/후 가격이 그대로 비교돼 거의 항상 ±30% 상하한가를 넘겨 "정보 없음"으로 빠지는데
+    // (52주 고저와 같은 사각지대), adjclose는 currentPrice와 같은(분할 반영된) 기준이라
+    // 분할 당일에도 정확한 등락률을 낼 수 있다. 평소엔 adjclose가 raw close와 거의 같아
+    // 표시값에 차이가 없다.
+    const lastAdjClose = validAdjCloses[validAdjCloses.length - 1];
     const lastCloseIsToday =
-      typeof lastClose === 'number' &&
-      lastClose !== 0 &&
-      Math.abs(lastClose - currentPrice) / lastClose < 0.005;
+      typeof lastAdjClose === 'number' &&
+      lastAdjClose !== 0 &&
+      Math.abs(lastAdjClose - currentPrice) / lastAdjClose < 0.005;
     const previousClose = lastCloseIsToday
-      ? validCloses[validCloses.length - 2]
-      : validCloses[validCloses.length - 1];
+      ? validAdjCloses[validAdjCloses.length - 2]
+      : validAdjCloses[validAdjCloses.length - 1];
     let changePercent =
       typeof previousClose === 'number' && previousClose !== 0
         ? ((currentPrice - previousClose) / previousClose) * 100
