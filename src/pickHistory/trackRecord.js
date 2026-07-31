@@ -20,6 +20,14 @@ const SCORABLE_RATINGS = new Set(['매수 고려', '주의']);
 const MIN_AGE_DAYS = 3; // 최소 이 정도는 지나야 "결과가 어느 정도 드러났다"고 보고 집계 대상에 포함
 const MIN_SAMPLE_SIZE = 10; // 등급별 표본이 이보다 적으면 아직 근거로 쓰기엔 부족하다고 보고 null 반환
 
+// scorePick에서 쓰는 기준. pick.price(판단 당시 raw 현재가)와 지금의 raw 현재가를 그대로
+// 비교하는데, 그 사이에 액면분할이 있었으면(priceData의 52주 고저/등락률에서 이미 겪은 것과
+// 같은 원인) 며칠~한 달 만에 -80~-90% 같은 터무니없는 수익률이 나올 수 있다. adjclose처럼
+// 과거 시점의 pick.price를 사후에 보정할 방법이 없으므로(당시 분할 비율을 모름), 이상치를
+// 걸러내는 방식으로 방어한다. 아무리 변동성이 큰 대형주라도 1주~1개월 만에 이 폭을 넘는
+// 수익률은 실제 시세 변동보다는 분할 등 데이터 불일치일 가능성이 훨씬 크다고 보고 제외한다.
+const MAX_PLAUSIBLE_RETURN_PERCENT = 80;
+
 function daysBetween(a, b) {
   return Math.abs(a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24);
 }
@@ -67,6 +75,13 @@ async function scorePick(pick, contextByCode) {
   if (typeof currentPrice !== 'number') return null;
 
   const returnPercent = Math.round(((currentPrice - pick.price) / pick.price) * 10000) / 100;
+  if (Math.abs(returnPercent) > MAX_PLAUSIBLE_RETURN_PERCENT) {
+    console.warn(
+      `[pickHistory] "${pick.name}" 수익률 ${returnPercent.toFixed(2)}%는 비현실적으로 커서(액면분할 등 데이터 불일치 가능성) 트랙레코드 집계에서 제외`
+    );
+    return null;
+  }
+
   const hit = pick.rating === '매수 고려' ? returnPercent > 0 : returnPercent < 0;
   return { name: pick.name, rating: pick.rating, returnPercent, hit };
 }
