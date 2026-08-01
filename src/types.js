@@ -39,7 +39,9 @@
 /**
  * @typedef {Object} PriceInfo
  * @property {number} currentPrice
- * @property {number|null} changePercent - 전일 대비 등락률(%)
+ * @property {number|null} changePercent - 등락률(%). 비교 기준일은 previousCloseLabel 참고
+ * @property {string|null} previousCloseLabel - "전일대비"(직전 거래일이 정말 어제인 경우) 또는
+ *   "N/D 종가 대비"(주말/공휴일을 건너뛰어 직전 거래일이 어제가 아닌 경우)
  * @property {number|null} high52w
  * @property {number|null} low52w
  * @property {string} currency

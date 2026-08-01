@@ -45,6 +45,7 @@ function buildWatchlistCandidates(existingCodes) {
  * @property {number} mentionCount - 오늘 뉴스에서 언급된 횟수(관심도 힌트)
  * @property {number} currentPrice
  * @property {number|null} changePercent
+ * @property {string|null} previousCloseLabel - "전일대비" 또는 "N/D 종가 대비"(휴장일 건너뜀)
  * @property {number|null} high52w
  * @property {number|null} low52w
  * @property {string} currency

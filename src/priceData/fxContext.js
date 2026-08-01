@@ -15,7 +15,8 @@ const USD_KRW_TICKER = 'KRW=X';
 /**
  * @typedef {Object} FxContext
  * @property {number} currentPrice - 원/달러 환율(1달러당 원)
- * @property {number|null} changePercent - 전일 대비 등락률(%)
+ * @property {number|null} changePercent - 등락률(%). 비교 기준일은 previousCloseLabel 참고
+ * @property {string|null} previousCloseLabel - "전일대비" 또는 "N/D 종가 대비"(휴장일 건너뜀)
  * @property {number|null} high52w
  * @property {number|null} low52w
  */
@@ -27,6 +28,6 @@ export async function fetchFxContext() {
   const info = await fetchPriceInfo(USD_KRW_TICKER, null);
   if (!info) return null;
 
-  const { currentPrice, changePercent, high52w, low52w } = info;
-  return { currentPrice, changePercent, high52w, low52w };
+  const { currentPrice, changePercent, previousCloseLabel, high52w, low52w } = info;
+  return { currentPrice, changePercent, previousCloseLabel, high52w, low52w };
 }

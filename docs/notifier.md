@@ -252,4 +252,13 @@ export function scheduleDailyRun(runFn, options) { ... }
 - Playwright로 실제 값(1,441.98원, -0.77%, 52주 1,378~1,554원)을 넣어 렌더링한 스크린샷으로
   가독성 개선과 모양 통일성을 직접 확인.
 
+### 2026-08-01 — 휴장일 등락률 라벨 표시 (renderPriceInfo/renderFxContext)
+- `priceData`의 휴장일 등락률 오표시 수정(`docs/priceData.md` 참고)에 맞춰, 리포트에서도
+  하드코딩된 "전일대비" 대신 `priceInfo.previousCloseLabel`/`fxContext.previousCloseLabel`을
+  사용하도록 변경.
+- `renderPriceInfo`(종목 카드 "시세" 줄)는 평소(라벨이 "전일대비"인 경우)엔 기존과 동일하게
+  `+N%`만 표시하고, 휴장일을 건너뛴 경우에만 `+N%, 7/29 종가 대비`처럼 기준일을 덧붙여
+  표시(평소 표시가 불필요하게 장황해지지 않도록).
+- `renderFxContext`(히어로 영역 환율)도 동일하게 라벨을 반영.
+
 <!-- 이 모듈을 수정할 때마다 아래에 "### YYYY-MM-DD — 변경 요약" 형식으로 새 항목을 추가할 것 -->

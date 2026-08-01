@@ -32,10 +32,11 @@ export async function enrichPicksWithPriceData(picks, marketContext = []) {
 
       const cached = contextByCode.get(ticker.code);
       if (cached) {
-        const { currentPrice, changePercent, high52w, low52w, currency, annualizedVolatilityPercent } = cached;
+        const { currentPrice, changePercent, previousCloseLabel, high52w, low52w, currency, annualizedVolatilityPercent } =
+          cached;
         return {
           ...pick,
-          priceInfo: { currentPrice, changePercent, high52w, low52w, currency, annualizedVolatilityPercent },
+          priceInfo: { currentPrice, changePercent, previousCloseLabel, high52w, low52w, currency, annualizedVolatilityPercent },
         };
       }
 

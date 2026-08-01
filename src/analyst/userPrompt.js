@@ -22,6 +22,7 @@ const BACKGROUND_ONLY_CATEGORIES = new Set([
 function formatMarketContextEntry(entry, index) {
   const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('ko-KR') : '정보 없음');
   const change = typeof entry.changePercent === 'number' ? `${entry.changePercent > 0 ? '+' : ''}${entry.changePercent}%` : '정보 없음';
+  const changeLabel = entry.previousCloseLabel ?? '전일대비';
   const vol =
     typeof entry.annualizedVolatilityPercent === 'number'
       ? `${entry.annualizedVolatilityPercent}%(일 변동성 약 ±${(entry.annualizedVolatilityPercent / Math.sqrt(252)).toFixed(1)}%)`
@@ -37,7 +38,7 @@ function formatMarketContextEntry(entry, index) {
 
   return (
     `${index + 1}. ${entry.name}(${entry.code}) - ${mentionLabel}\n` +
-    `   현재가: ${fmt(entry.currentPrice)}${entry.currency ?? ''} (전일대비 ${change}), ` +
+    `   현재가: ${fmt(entry.currentPrice)}${entry.currency ?? ''} (${changeLabel} ${change}), ` +
     `52주 ${fmt(entry.low52w)}~${fmt(entry.high52w)}\n` +
     `   연환산 변동성: ${vol} | PER: ${per} (추정PER: ${forwardPer}) | PBR: ${pbr} | ` +
     `배당수익률: ${dividendYield} | 외국인 보유율: ${foreignOwnershipRate}`
@@ -51,7 +52,8 @@ function formatFxContext(fx) {
   const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('ko-KR') : '정보 없음');
   const change =
     typeof fx.changePercent === 'number' ? `${fx.changePercent > 0 ? '+' : ''}${fx.changePercent}%` : '정보 없음';
-  return `원/달러 환율: ${fmt(fx.currentPrice)}원 (전일대비 ${change}), 52주 ${fmt(fx.low52w)}~${fmt(fx.high52w)}원`;
+  const changeLabel = fx.previousCloseLabel ?? '전일대비';
+  return `원/달러 환율: ${fmt(fx.currentPrice)}원 (${changeLabel} ${change}), 52주 ${fmt(fx.low52w)}~${fmt(fx.high52w)}원`;
 }
 
 /**

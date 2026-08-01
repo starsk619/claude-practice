@@ -12,6 +12,13 @@
  *   배열에서 계산한다. 등락률/52주 고저/변동성 전부 액면분할·배당을 보정한 adjclose를
  *   기준으로 계산하고, 코스피/코스닥 상하한가(±30%)를 넘는 값은 기업행위/데이터 오류로
  *   보고 이상치로 제외한다.
+ * - "전일 종가"가 정확히 어느 거래일인지는 가격(근사치 비교)이 아니라 result.timestamp
+ *   (일별 종가 각각의 실제 날짜)로 판정한다. 주말/공휴일처럼 오늘이 휴장일이면 currentPrice가
+ *   과거 종가 배열의 마지막 값과 우연히 같아지는데, 이때 가격만 보고 "오늘자 데이터"라고
+ *   오판하면 실제로는 이틀 전 거래일과 비교하면서 "전일대비"라고 잘못 표시하는 문제가 있었다
+ *   (예: 토요일에 실행하면 금요일 종가를 두 번째로 최근 거래일의 종가와 비교해버림). 그래서
+ *   previousClose가 정말 "어제(오늘의 KST 날짜 - 1일)"인지도 함께 판정해서, 아니라면
+ *   "N/D 종가 대비"처럼 실제 기준일을 명시하는 라벨을 함께 반환한다.
  */
 
 const CHART_API_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart/';
@@ -20,6 +27,18 @@ const HISTORY_INTERVAL = '1d';
 const TRADING_DAYS_PER_YEAR = 252;
 const VOLATILITY_WINDOW_DAYS = 63; // 약 3개월치 거래일
 const KRX_DAILY_LIMIT_PERCENT = 30; // 코스피/코스닥 개별 종목 일일 상하한가
+const KST_TIME_ZONE = 'Asia/Seoul';
+const KST_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: KST_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** @returns {string} KST 기준 "YYYY-MM-DD" */
+function toKstDateString(date) {
+  return KST_DATE_FORMATTER.format(date);
+}
 
 /**
  * 일별 종가 배열로 연환산 변동성(%)을 계산한다 (일별 로그수익률의 표준편차 × sqrt(252) × 100).
@@ -53,8 +72,9 @@ function computeAnnualizedVolatilityPercent(closes) {
  * @param {string | null} [suffix] - 'KS'(코스피) | 'KQ'(코스닥) | 'KN'(코넥스, 사실상 미지원).
  *   해외 상장 종목처럼 국가 접미사가 없는 경우 null/빈 값을 넘기면 종목코드 그대로 조회한다.
  * @returns {Promise<{
- *   currentPrice: number, changePercent: number|null, high52w: number|null, low52w: number|null,
- *   currency: string, annualizedVolatilityPercent: number|null
+ *   currentPrice: number, changePercent: number|null, previousCloseLabel: string|null,
+ *   high52w: number|null, low52w: number|null, currency: string,
+ *   annualizedVolatilityPercent: number|null
  * } | null>}
  */
 export async function fetchPriceInfo(code, suffix) {
@@ -79,9 +99,24 @@ export async function fetchPriceInfo(code, suffix) {
     }
 
     const currentPrice = meta.regularMarketPrice;
+    const timestamps = result?.timestamp;
     const closes = result?.indicators?.quote?.[0]?.close;
     const adjCloses = result?.indicators?.adjclose?.[0]?.adjclose ?? closes;
-    const validAdjCloses = (adjCloses ?? []).filter((c) => typeof c === 'number' && c > 0);
+
+    // 종가/조정종가/날짜(timestamp)를 하나의 배열로 묶어서 다룬다 - 세 배열이 같은 인덱스로
+    // 정렬돼 있다는 전제(Yahoo 응답 구조)가 필요한데, filter를 각각 따로 하면 인덱스가
+    // 어긋날 수 있어 반드시 함께 묶은 뒤에 필터링한다.
+    const bars = (timestamps ?? [])
+      .map((timestamp, i) => ({ timestamp, close: closes?.[i], adjClose: adjCloses?.[i] }))
+      .filter(
+        (bar) =>
+          typeof bar.timestamp === 'number' &&
+          typeof bar.close === 'number' &&
+          bar.close > 0 &&
+          typeof bar.adjClose === 'number' &&
+          bar.adjClose > 0
+      );
+    const validAdjCloses = bars.map((bar) => bar.adjClose);
 
     // 52주 고/저는 raw close가 아니라 adjclose(분할/배당 보정 종가) 기준으로 계산한다.
     // raw close로 계산했더니, 조회 시점(1년) 안에 액면분할이 있었던 종목(예: SK하이닉스)에서
@@ -99,21 +134,29 @@ export async function fetchPriceInfo(code, suffix) {
     // meta.chartPreviousClose는 "전일 종가"가 아니라 "조회 range 시작 직전 종가"라
     // range를 바꾸면 비교 기준 시점이 통째로 바뀌어버린다(range=1y일 땐 1년 전과 비교하는
     // 셈이 되어 거의 모든 종목이 이상치로 잡히는 문제가 있었음). 그래서 range와 무관하게
-    // 항상 "어제 종가"를 가리키도록, 직접 받아온 일별 종가 배열의 마지막 두 값을 쓴다.
-    // (currentPrice가 이미 마지막 종가와 거의 같다면 그 값은 "오늘자"이므로 한 칸 더 앞을 쓴다.)
-    // raw close가 아니라 adjclose를 쓰는 이유: raw close로 계산하면 액면분할 당일엔 분할
-    // 전/후 가격이 그대로 비교돼 거의 항상 ±30% 상하한가를 넘겨 "정보 없음"으로 빠지는데
-    // (52주 고저와 같은 사각지대), adjclose는 currentPrice와 같은(분할 반영된) 기준이라
-    // 분할 당일에도 정확한 등락률을 낼 수 있다. 평소엔 adjclose가 raw close와 거의 같아
-    // 표시값에 차이가 없다.
-    const lastAdjClose = validAdjCloses[validAdjCloses.length - 1];
-    const lastCloseIsToday =
-      typeof lastAdjClose === 'number' &&
-      lastAdjClose !== 0 &&
-      Math.abs(lastAdjClose - currentPrice) / lastAdjClose < 0.005;
-    const previousClose = lastCloseIsToday
-      ? validAdjCloses[validAdjCloses.length - 2]
-      : validAdjCloses[validAdjCloses.length - 1];
+    // 항상 정확한 "직전 거래일 종가"를 가리키도록, 각 종가의 실제 날짜(timestamp)를 오늘의
+    // KST 날짜와 직접 비교해서 판정한다(가격 근사치 비교는 주말/공휴일에 오작동하는 문제가
+    // 있었음 - 파일 상단 설명 참고). raw close가 아니라 adjclose를 쓰는 이유: 액면분할
+    // 당일엔 raw close가 분할 전/후로 섞여 거의 항상 ±30% 상하한가를 넘겨 "정보 없음"으로
+    // 빠지는데, adjclose는 currentPrice와 같은(분할 반영된) 기준이라 분할 당일에도 정확한
+    // 등락률을 낼 수 있다. 평소엔 adjclose가 raw close와 거의 같아 표시값에 차이가 없다.
+    const now = new Date();
+    const todayKst = toKstDateString(now);
+    const yesterdayKst = toKstDateString(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+
+    const lastBar = bars[bars.length - 1];
+    const lastBarIsToday = lastBar ? toKstDateString(new Date(lastBar.timestamp * 1000)) === todayKst : false;
+    const previousBar = lastBarIsToday ? bars[bars.length - 2] : lastBar;
+    const previousClose = previousBar?.adjClose;
+    const previousCloseKst = previousBar ? toKstDateString(new Date(previousBar.timestamp * 1000)) : null;
+    // 직전 거래일이 정말 "어제"면 "전일대비"라고 써도 되지만, 주말/공휴일을 건너뛴
+    // 경우("금요일 종가"가 직전 거래일인데 오늘이 월요일 등)에는 착각하지 않도록 실제
+    // 기준일을 명시한다.
+    const previousCloseLabel =
+      previousCloseKst && previousCloseKst !== yesterdayKst
+        ? `${Number(previousCloseKst.slice(5, 7))}/${Number(previousCloseKst.slice(8, 10))} 종가 대비`
+        : '전일대비';
+
     let changePercent =
       typeof previousClose === 'number' && previousClose !== 0
         ? ((currentPrice - previousClose) / previousClose) * 100
@@ -131,6 +174,9 @@ export async function fetchPriceInfo(code, suffix) {
     return {
       currentPrice,
       changePercent: changePercent !== null ? Math.round(changePercent * 100) / 100 : null,
+      // changePercent가 null이면(이상치 제외 등) 굳이 "전일대비"라고 표시할 근거도 없으므로
+      // 라벨도 함께 비워서, 값 없이 라벨만 남는 어색한 표시를 방지한다.
+      previousCloseLabel: changePercent !== null ? previousCloseLabel : null,
       high52w,
       low52w,
       currency,

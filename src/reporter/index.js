@@ -119,6 +119,7 @@ function renderFxContext(fxContext) {
   const change = typeof fxContext.changePercent === 'number' ? fxContext.changePercent : null;
   const changeText = change !== null ? `${change > 0 ? '+' : ''}${change}%` : '정보 없음';
   const changeClass = change === null ? '' : change > 0 ? 'fx-up' : change < 0 ? 'fx-down' : '';
+  const changeLabel = fxContext.previousCloseLabel ?? '전일대비';
   const rangeText =
     typeof fxContext.low52w === 'number' && typeof fxContext.high52w === 'number'
       ? ` <span class="fx-range">(52주 ${fxContext.low52w.toLocaleString('ko-KR')}~${fxContext.high52w.toLocaleString('ko-KR')}원)</span>`
@@ -128,7 +129,7 @@ function renderFxContext(fxContext) {
     <div class="hero-fx">
       <span class="hero-fx-chip">
         💱 원/달러 환율: <strong>${fxContext.currentPrice.toLocaleString('ko-KR')}원</strong>
-        <span class="${changeClass}">(전일대비 ${escapeHtml(changeText)})</span>${rangeText}
+        <span class="${changeClass}">(${escapeHtml(changeLabel)} ${escapeHtml(changeText)})</span>${rangeText}
       </span>
     </div>`;
 }
@@ -281,7 +282,7 @@ function renderPriceInfo(priceInfo) {
   if (!priceInfo) {
     return '<span class="price-missing">가격 정보 없음 (종목명 매핑 또는 시세 조회 실패)</span>';
   }
-  const { currentPrice, changePercent, high52w, low52w, currency } = priceInfo;
+  const { currentPrice, changePercent, previousCloseLabel, high52w, low52w, currency } = priceInfo;
   const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('ko-KR') : '-');
   const currencyLabel = escapeHtml(currency ?? '');
 
@@ -289,7 +290,11 @@ function renderPriceInfo(priceInfo) {
   if (typeof changePercent === 'number') {
     const sign = changePercent > 0 ? '+' : '';
     const cls = changePercent > 0 ? 'price-up' : changePercent < 0 ? 'price-down' : 'price-flat';
-    changeHtml = `<span class="${cls}">${sign}${changePercent}%</span>`;
+    // 직전 거래일이 어제가 아니면(휴장일을 건너뛴 경우) 기준일을 함께 표시해서, "전일대비"로
+    // 오해하지 않도록 한다(평소엔 previousCloseLabel이 "전일대비"라 아무 것도 안 붙음).
+    const labelSuffix =
+      previousCloseLabel && previousCloseLabel !== '전일대비' ? `, ${escapeHtml(previousCloseLabel)}` : '';
+    changeHtml = `<span class="${cls}">${sign}${changePercent}%${labelSuffix}</span>`;
   }
 
   return `${fmt(currentPrice)}${currencyLabel} (${changeHtml}) · 52주 ${fmt(low52w)}~${fmt(high52w)}`;
