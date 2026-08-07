@@ -19,6 +19,12 @@
  *   (예: 토요일에 실행하면 금요일 종가를 두 번째로 최근 거래일의 종가와 비교해버림). 그래서
  *   previousClose가 정말 "어제(오늘의 KST 날짜 - 1일)"인지도 함께 판정해서, 아니라면
  *   "N/D 종가 대비"처럼 실제 기준일을 명시하는 라벨을 함께 반환한다.
+ * - GitHub Actions는 매일 08:00 KST에 도는데 KRX 개장은 09:00라, 장 시작 전에는
+ *   currentPrice가 사실상 어제 종가 그대로다. 이때 "어제 종가와 비교해서 0%"라고 보여주면
+ *   기술적으로는 맞지만 아무 정보가 없다 — 그래서 지금이 KRX 정규장(평일 09:00~15:30 KST)이
+ *   아니고 오늘자 봉도 아직 없으면, currentPrice 대신 "가장 최근에 끝난 거래 세션 자체가
+ *   그 전 세션 대비 얼마나 움직였는지"를 보여주고 "M/D(요일) 마감 기준"으로 라벨링한다
+ *   (주말/공휴일에 실행되는 경우도 같은 방식으로 자연스럽게 처리됨).
  */
 
 const CHART_API_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart/';
@@ -27,6 +33,8 @@ const HISTORY_INTERVAL = '1d';
 const TRADING_DAYS_PER_YEAR = 252;
 const VOLATILITY_WINDOW_DAYS = 63; // 약 3개월치 거래일
 const KRX_DAILY_LIMIT_PERCENT = 30; // 코스피/코스닥 개별 종목 일일 상하한가
+const KRX_OPEN_MINUTES = 9 * 60; // KRX 정규장 시작 09:00 KST
+const KRX_CLOSE_MINUTES = 15 * 60 + 30; // KRX 정규장 종료 15:30 KST
 const KST_TIME_ZONE = 'Asia/Seoul';
 const KST_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
   timeZone: KST_TIME_ZONE,
@@ -34,10 +42,27 @@ const KST_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
   month: '2-digit',
   day: '2-digit',
 });
+const KST_WEEKDAY_FORMATTER = new Intl.DateTimeFormat('en-US', { timeZone: KST_TIME_ZONE, weekday: 'short' });
+const KST_WEEKDAY_KO_FORMATTER = new Intl.DateTimeFormat('ko-KR', { timeZone: KST_TIME_ZONE, weekday: 'short' });
+const KST_HOUR_FORMATTER = new Intl.DateTimeFormat('en-GB', {
+  timeZone: KST_TIME_ZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
 
 /** @returns {string} KST 기준 "YYYY-MM-DD" */
 function toKstDateString(date) {
   return KST_DATE_FORMATTER.format(date);
+}
+
+/** @returns {boolean} 지금이 KRX 정규장 시간(평일 09:00~15:30 KST)인지. 공휴일은 반영 안 함. */
+function isLikelyKrxLiveSession(date) {
+  const weekday = KST_WEEKDAY_FORMATTER.format(date);
+  if (weekday === 'Sat' || weekday === 'Sun') return false;
+  const [hour, minute] = KST_HOUR_FORMATTER.format(date).split(':').map(Number);
+  const minutesNow = hour * 60 + minute;
+  return minutesNow >= KRX_OPEN_MINUTES && minutesNow < KRX_CLOSE_MINUTES;
 }
 
 /**
@@ -146,20 +171,26 @@ export async function fetchPriceInfo(code, suffix) {
 
     const lastBar = bars[bars.length - 1];
     const lastBarIsToday = lastBar ? toKstDateString(new Date(lastBar.timestamp * 1000)) === todayKst : false;
-    const previousBar = lastBarIsToday ? bars[bars.length - 2] : lastBar;
+    const isLive = !lastBarIsToday && isLikelyKrxLiveSession(now);
+    // 오늘자 봉도 없고 지금 장중도 아니면(장 시작 전/장 마감 후/휴장일) currentPrice는
+    // 사실상 마지막 종가 그대로라서 "0%"만 나온다 - 대신 가장 최근에 끝난 세션(lastBar)
+    // 자체가 그 전 세션 대비 얼마나 움직였는지를 보여준다(파일 상단 설명 참고).
+    const showsCompletedSessionOnly = !lastBarIsToday && !isLive;
+    const referenceBar = showsCompletedSessionOnly ? lastBar : null;
+
+    const previousBar = isLive ? lastBar : bars[bars.length - 2];
     const previousClose = previousBar?.adjClose;
     const previousCloseKst = previousBar ? toKstDateString(new Date(previousBar.timestamp * 1000)) : null;
-    // 직전 거래일이 정말 "어제"면 "전일대비"라고 써도 되지만, 주말/공휴일을 건너뛴
-    // 경우("금요일 종가"가 직전 거래일인데 오늘이 월요일 등)에는 착각하지 않도록 실제
-    // 기준일을 명시한다.
-    const previousCloseLabel =
-      previousCloseKst && previousCloseKst !== yesterdayKst
-        ? `${Number(previousCloseKst.slice(5, 7))}/${Number(previousCloseKst.slice(8, 10))} 종가 대비`
-        : '전일대비';
+
+    const comparePrice = referenceBar ? referenceBar.adjClose : currentPrice;
+    // showsCompletedSessionOnly일 땐 화면에 보여줄 "현재가"도 referenceBar의 (반올림된)
+    // 종가로 맞춘다 - 실시간이 아닌데 meta.regularMarketPrice의 미세한 노이즈로 값이
+    // 살짝 어긋나는 것을 방지하기 위함(52주 고저와 같은 이유로 adjclose 기준 반올림).
+    const displayPrice = referenceBar ? roundToCurrencyUnit(referenceBar.adjClose) : currentPrice;
 
     let changePercent =
-      typeof previousClose === 'number' && previousClose !== 0
-        ? ((currentPrice - previousClose) / previousClose) * 100
+      typeof previousClose === 'number' && previousClose !== 0 && typeof comparePrice === 'number'
+        ? ((comparePrice - previousClose) / previousClose) * 100
         : null;
     if (changePercent !== null && Math.abs(changePercent) > KRX_DAILY_LIMIT_PERCENT) {
       console.warn(
@@ -168,11 +199,28 @@ export async function fetchPriceInfo(code, suffix) {
       changePercent = null;
     }
 
+    // showsCompletedSessionOnly일 땐 "전일대비"라는 실시간 뉘앙스 대신, 이게 어느 세션의
+    // 마감 결과인지 항상 날짜(+요일)로 명시한다. 그 외(장중/장마감후 재조회)엔 직전 거래일이
+    // 정말 "어제"인지에 따라 "전일대비" 또는 "N/D 종가 대비"를 쓴다(주말/공휴일을 건너뛴
+    // 경우 착각 방지).
+    const previousCloseLabel = (() => {
+      if (!previousCloseKst) return null;
+      if (referenceBar) {
+        const refDate = new Date(referenceBar.timestamp * 1000);
+        const refKst = toKstDateString(refDate);
+        const weekdayKo = KST_WEEKDAY_KO_FORMATTER.format(refDate);
+        return `${Number(refKst.slice(5, 7))}/${Number(refKst.slice(8, 10))}(${weekdayKo}) 마감 기준`;
+      }
+      return previousCloseKst !== yesterdayKst
+        ? `${Number(previousCloseKst.slice(5, 7))}/${Number(previousCloseKst.slice(8, 10))} 종가 대비`
+        : '전일대비';
+    })();
+
     // 변동성은 분할/배당 보정된 adjclose로 계산해 기업행위로 인한 인위적 급등락을 배제한다.
     const recentAdjCloses = validAdjCloses.slice(-VOLATILITY_WINDOW_DAYS);
 
     return {
-      currentPrice,
+      currentPrice: displayPrice,
       changePercent: changePercent !== null ? Math.round(changePercent * 100) / 100 : null,
       // changePercent가 null이면(이상치 제외 등) 굳이 "전일대비"라고 표시할 근거도 없으므로
       // 라벨도 함께 비워서, 값 없이 라벨만 남는 어색한 표시를 방지한다.
